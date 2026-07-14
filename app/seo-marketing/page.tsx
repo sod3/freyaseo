@@ -1,15 +1,11 @@
-import type { Metadata } from "next";
-import { ServicesLandingPage } from "@/src/components/pages/ServicesLandingPage";
-import { servicesLanding } from "@/src/content/services";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: servicesLanding.en.seoTitle,
-  description: servicesLanding.en.metaDescription,
-  path: servicesLanding.en.path,
-  locale: "en",
-});
+const page = wpClonePages["en_services"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <ServicesLandingPage locale="en" />;
+  return <WpClonePage page={page} />;
 }

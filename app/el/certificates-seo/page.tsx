@@ -1,15 +1,11 @@
-import type { Metadata } from "next";
-import { CertificatesPage } from "@/src/components/pages/CertificatesPage";
-import { certificatesPage } from "@/src/content/certificates";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: certificatesPage.el.seoTitle,
-  description: certificatesPage.el.metaDescription,
-  path: certificatesPage.el.path,
-  locale: "el",
-});
+const page = wpClonePages["el_certificates"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <CertificatesPage locale="el" />;
+  return <WpClonePage page={page} />;
 }

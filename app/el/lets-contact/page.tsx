@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
-import { ContactPage } from "@/src/components/pages/ContactPage";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Επικοινωνία με τη Freya SEO | Δωρεάν SEO συζήτηση",
-  description: "Επικοινωνήστε με τη Freya SEO για AI SEO, αυτοματισμούς, αναφορές ή custom SEO εργαλεία.",
-  path: "/el/lets-contact/",
-  locale: "el",
-});
+const page = wpClonePages["el_contact"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <ContactPage locale="el" />;
+  return <WpClonePage page={page} />;
 }

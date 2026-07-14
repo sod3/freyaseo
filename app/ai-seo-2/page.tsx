@@ -1,17 +1,11 @@
-import type { Metadata } from "next";
-import { ServicePageTemplate } from "@/src/components/services/ServicePageTemplate";
-import { getServicePage } from "@/src/content/services";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-const service = getServicePage("en", "aiSeo");
+const page = wpClonePages["en_ai_seo"];
 
-export const metadata: Metadata = pageMetadata({
-  title: "AI SEO services for Google and AI search | Freya SEO",
-  description: service.description,
-  path: service.href,
-  locale: "en",
-});
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <ServicePageTemplate service={service} />;
+  return <WpClonePage page={page} />;
 }

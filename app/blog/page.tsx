@@ -1,15 +1,11 @@
-import type { Metadata } from "next";
-import { BlogPage } from "@/src/components/pages/BlogPage";
-import { blogPageCopy } from "@/src/content/blog";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: blogPageCopy.en.seoTitle,
-  description: blogPageCopy.en.metaDescription,
-  path: blogPageCopy.en.path,
-  locale: "en",
-});
+const page = wpClonePages["en_blog"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <BlogPage locale="en" />;
+  return <WpClonePage page={page} />;
 }

@@ -1,24 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans } from "next/font/google";
-import { Header } from "@/src/components/layout/Header";
-import { Footer } from "@/src/components/layout/Footer";
-import { commonEn } from "@/src/content/common/en";
 import "./globals.css";
-
-const notoSans = Noto_Sans({
-  variable: "--font-noto-sans",
-  subsets: ["latin", "greek"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.freyaseo.com"),
   title: {
-    default: "Freya SEO | AI-Powered SEO & Digital Growth",
+    default: "Rank First on Google & AI | Multilingual SEO Agency - FreyaSEO",
     template: "%s",
   },
   description:
-    "Freya SEO creates AI-powered SEO, automation, reporting and custom tools for measurable organic growth.",
+    "Freya SEO is an SEO agency specializing in SEO for AI search and multilingual SEO, helping businesses rank higher and grow in global markets.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -28,7 +18,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#082014",
+  themeColor: "#081c15",
 };
 
 export default function RootLayout({
@@ -38,14 +28,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${notoSans.variable} antialiased`}>
-        <a className="skip-link" href="#main-content">
-          {commonEn.skipToContent}
-        </a>
-        <Header />
-        <main id="main-content">{children}</main>
-        <Footer />
-      </body>
+      <head>
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link href="/wp-clone/wp-combined.css" rel="stylesheet" />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

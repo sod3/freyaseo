@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
-import { ContactPage } from "@/src/components/pages/ContactPage";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Contact Freya SEO | Free SEO consultation",
-  description: "Contact Freya SEO for AI SEO, automation, reporting or custom SEO tools.",
-  path: "/contact-2/",
-  locale: "en",
-});
+const page = wpClonePages["en_contact"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <ContactPage locale="en" />;
+  return <WpClonePage page={page} />;
 }

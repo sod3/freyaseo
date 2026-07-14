@@ -1,17 +1,11 @@
-import type { Metadata } from "next";
-import { ServicePageTemplate } from "@/src/components/services/ServicePageTemplate";
-import { getServicePage } from "@/src/content/services";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-const service = getServicePage("en", "reporting");
+const page = wpClonePages["en_report"];
 
-export const metadata: Metadata = pageMetadata({
-  title: "SEO reporting dashboards and analytics | Freya SEO",
-  description: service.description,
-  path: service.href,
-  locale: "en",
-});
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <ServicePageTemplate service={service} />;
+  return <WpClonePage page={page} />;
 }

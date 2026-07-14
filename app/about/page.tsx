@@ -1,15 +1,11 @@
-import type { Metadata } from "next";
-import { AboutPage } from "@/src/components/pages/AboutPage";
-import { aboutEn } from "@/src/content/pages/about.en";
-import { pageMetadata } from "@/src/lib/metadata";
+﻿import type { Metadata } from "next";
+import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
+import { wpClonePages } from "@/src/content/wp-clone/pages";
 
-export const metadata: Metadata = pageMetadata({
-  title: aboutEn.seoTitle,
-  description: aboutEn.metaDescription,
-  path: aboutEn.path,
-  locale: "en",
-});
+const page = wpClonePages["en_about"];
+
+export const metadata: Metadata = metadataForWpClonePage(page);
 
 export default function Page() {
-  return <AboutPage locale="en" />;
+  return <WpClonePage page={page} />;
 }
