@@ -235,8 +235,46 @@ function prepareFormValidation(form: HTMLFormElement, locale: Locale) {
   return () => form.removeEventListener("submit", onSubmit);
 }
 
+function prepareHomePage(root: HTMLElement) {
+  if (!root.classList.contains("home")) return;
+
+  const counterCopy = [
+    { number: "100", suffix: "+", title: "Happy Client" },
+    { number: "100", suffix: "", title: "Years of experience" },
+    { number: "10", suffix: "", title: "Total Traffic" },
+    { number: "900", suffix: "M", title: "" },
+  ];
+
+  root.querySelectorAll<HTMLElement>(".elementor-counter").forEach((counter, index) => {
+    const copy = counterCopy[index];
+    if (!copy) return;
+    counter.querySelector<HTMLElement>(".elementor-counter-number")?.replaceChildren(document.createTextNode(copy.number));
+    counter.querySelector<HTMLElement>(".elementor-counter-number-suffix")?.replaceChildren(document.createTextNode(copy.suffix));
+    counter.querySelector<HTMLElement>(".elementor-counter-title")?.replaceChildren(document.createTextNode(copy.title));
+    counter.toggleAttribute("data-empty-label", !copy.title);
+  });
+
+  root.querySelectorAll<HTMLElement>(".cert-marquee-content").forEach((track) => {
+    if (track.dataset.homeCertMarqueePrepared === "true") return;
+    const cards = Array.from(track.children).filter((child): child is HTMLElement => child.classList.contains("cert-card"));
+    const originals = cards.slice(0, 9);
+    cards.slice(9).forEach((card) => {
+      card.dataset.homeCertExtra = "true";
+      card.setAttribute("aria-hidden", "true");
+    });
+    originals.forEach((card) => {
+      const clone = card.cloneNode(true) as HTMLElement;
+      clone.setAttribute("aria-hidden", "true");
+      clone.dataset.homeCertClone = "true";
+      track.appendChild(clone);
+    });
+    track.dataset.homeCertMarqueePrepared = "true";
+  });
+}
+
 function applyVisualRepairs(root: HTMLElement) {
   root.dataset.wpCloneEnhanced = "true";
+  prepareHomePage(root);
 
   root.querySelectorAll<HTMLElement>(".tools-marquee-content").forEach((track) => {
     if (track.dataset.marqueePrepared === "true") return;
