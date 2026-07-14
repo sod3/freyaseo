@@ -1,4 +1,4 @@
-import type { Locale } from "@/src/types";
+import type { Locale, ServiceKey } from "@/src/types";
 
 export const siteUrl = "https://www.freyaseo.com";
 
@@ -25,6 +25,23 @@ export const routeMap = {
   "/el/lets-contact/": "/contact-2/",
 } as const;
 
+export type LocalizedServiceRoute = {
+  key: ServiceKey;
+  en: string;
+  el: string;
+};
+
+export const serviceRoutes = [
+  { key: "aiSeo", en: "/ai-seo-2/", el: "/el/ai-seo-4/" },
+  { key: "automation", en: "/automation/", el: "/el/automation-2/" },
+  { key: "reporting", en: "/report/", el: "/el/report-2/" },
+  { key: "toolGeneration", en: "/tool-generation/", el: "/el/tool-generation-2/" },
+] as const satisfies readonly LocalizedServiceRoute[];
+
+export const serviceRouteByKey = Object.fromEntries(
+  serviceRoutes.map((service) => [service.key, service]),
+) as Record<ServiceKey, LocalizedServiceRoute>;
+
 export const routeLocales = Object.fromEntries(
   Object.keys(routeMap).map((path) => [path, path.startsWith("/el/") ? "el" : "en"]),
 ) as Record<string, Locale>;
@@ -47,6 +64,10 @@ export function getAlternatePath(pathname: string) {
 export function getLocalizedPath(locale: Locale, englishPath: keyof typeof routeMap) {
   if (locale === "en") return englishPath;
   return routeMap[englishPath] ?? "/el/seo-agency/";
+}
+
+export function getLocalizedServicePath(locale: Locale, key: ServiceKey) {
+  return serviceRouteByKey[key][locale];
 }
 
 export const allStaticRoutes = Object.keys(routeMap).filter((path) => !path.includes("["));

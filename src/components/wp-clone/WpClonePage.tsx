@@ -14,9 +14,9 @@ export function metadataForWpClonePage(page: WpClonePageData): Metadata {
 
 export function WpClonePage({ page }: { page: WpClonePageData }) {
   return (
-    <div className={`wp-clone-root ${page.bodyClass}`} data-locale={page.locale} suppressHydrationWarning>
+    <div className={`wp-clone-root ${page.bodyClass}`} data-locale={page.locale} data-page-path={page.path} suppressHydrationWarning>
       <div dangerouslySetInnerHTML={{ __html: page.html }} />
-      <WpCloneBehavior locale={page.locale} />
+      <WpCloneBehavior locale={page.locale} pagePath={page.path} />
     </div>
   );
 }
