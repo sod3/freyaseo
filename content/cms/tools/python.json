@@ -1,0 +1,50 @@
+{
+  "name": "Python",
+  "englishName": "Python",
+  "greekName": "Python",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/python.png",
+  "logoAlt": {
+    "en": "Python logo",
+    "el": "Python logo"
+  },
+  "logoTitle": "Python",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 11,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Python",
+      "el": "Python"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "websiteName": "Freya SEO",
+  "defaultTitle": "Rank First on Google & AI | Multilingual SEO Agency - FreyaSEO",
+  "description": "Freya SEO is an SEO agency specializing in SEO for AI search and multilingual SEO, helping businesses rank higher and grow in global markets.",
+  "primaryDomain": "https://www.freyaseo.com",
+  "englishLogo": null,
+  "greekLogo": null,
+  "mobileLogo": null,
+  "favicon": null,
+  "appleTouchIcon": null,
+  "defaultSocialImage": null,
+  "businessName": "Freya SEO",
+  "businessEmail": "",
+  "phoneNumber": "",
+  "whatsAppNumber": "",
+  "address": "",
+  "workingHours": {
+    "en": "",
+    "el": ""
+  },
+  "socialLinks": [
+    {
+      "label": {
+        "en": "Instagram",
+        "el": "Instagram"
+      },
+      "url": "https://www.instagram.com/freyaseo",
+      "target": "_blank",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "LinkedIn",
+        "el": "LinkedIn"
+      },
+      "url": "https://www.linkedin.com/company/freya-seo",
+      "target": "_blank",
+      "nofollow": false
+    }
+  ],
+  "copyrightText": {
+    "en": "© Freya SEO. All rights reserved.",
+    "el": "© Freya SEO. All rights reserved."
+  },
+  "defaultCtaLabel": {
+    "en": "Free SEO Check",
+    "el": "Δωρεάν SEO Έλεγχος"
+  },
+  "defaultCtaUrl": "/contact-2/",
+  "maintenanceMode": false,
+  "announcementBarText": {
+    "en": "AI-powered SEO and digital growth for Google, ChatGPT, Gemini and beyond.",
+    "el": "SEO και ψηφιακή ανάπτυξη με τη δύναμη της τεχνητής νοημοσύνης για Google, ChatGPT, Gemini και ό,τι έρχεται μετά."
+  },
+  "announcementBarVisible": false,
+  "defaultLanguage": "en",
+  "availableLanguages": [
+    "en",
+    "el"
+  ],
+  "contactFormRecipient": "",
+  "formSuccessMessage": {
+    "en": "Thank you. Your message is ready to send.",
+    "el": "Ευχαριστούμε. Το μήνυμά σας είναι έτοιμο για αποστολή."
+  },
+  "formErrorMessage": {
+    "en": "Please check the form and try again.",
+    "el": "Παρακαλώ ελέγξτε τη φόρμα και δοκιμάστε ξανά."
+  }
+}

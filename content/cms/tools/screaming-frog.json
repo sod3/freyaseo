@@ -1,0 +1,50 @@
+{
+  "name": "Screaming Frog",
+  "englishName": "Screaming Frog",
+  "greekName": "Screaming Frog",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/screaming-frog.svg",
+  "logoAlt": {
+    "en": "Screaming Frog logo",
+    "el": "Screaming Frog logo"
+  },
+  "logoTitle": "Screaming Frog",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 5,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Screaming Frog",
+      "el": "Screaming Frog"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

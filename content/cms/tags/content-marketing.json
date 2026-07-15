@@ -1,0 +1,23 @@
+{
+  "name": "Content Marketing",
+  "greekName": "Content Marketing",
+  "description": {
+    "en": "",
+    "el": ""
+  },
+  "language": "en",
+  "indexArchive": true,
+  "seo": {
+    "title": {
+      "en": "Content Marketing",
+      "el": "Content Marketing"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "customMeta": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Content Marketing Principles for Business",
+  "issuer": "Semrush",
+  "image": null,
+  "imageAlt": {
+    "en": "Content Marketing Principles for Business",
+    "el": "Content Marketing Principles for Business"
+  },
+  "credentialUrl": "https://static.semrush.com/",
+  "issueDate": "2026-01-01",
+  "expiryDate": null,
+  "description": {
+    "en": "Content Marketing",
+    "el": "Content Marketing"
+  },
+  "tags": [
+    "content-marketing"
+  ],
+  "displayOrder": 7,
+  "active": true
+}

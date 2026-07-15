@@ -1,0 +1,23 @@
+{
+  "name": "Analytics",
+  "greekName": "Analytics",
+  "description": {
+    "en": "",
+    "el": ""
+  },
+  "language": "en",
+  "indexArchive": true,
+  "seo": {
+    "title": {
+      "en": "Analytics",
+      "el": "Analytics"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "customMeta": []
+  }
+}

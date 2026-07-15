@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { getAlternatePath, normalizePath, serviceRoutes } from "@/src/content/route-map";
 import type { Locale } from "@/src/types";
 
@@ -203,10 +204,12 @@ function prepareFormValidation(form: HTMLFormElement, locale: Locale) {
     return !message;
   };
 
-  const onSubmit = (event: SubmitEvent) => {
+  const onSubmit = async (event: SubmitEvent) => {
     event.preventDefault();
     const fields = Array.from(
-      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input[name='name-1'], input[name='email-1'], textarea[name='textarea-1']"),
+      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        "input[name='name-1'], input[name='your-name'], input[name='email-1'], input[name='your-email'], input[name='your-subject'], textarea[name='textarea-1'], textarea[name='your-message']",
+      ),
     );
     const valid = fields.every(validateField);
     if (!valid) {
@@ -220,15 +223,35 @@ function prepareFormValidation(form: HTMLFormElement, locale: Locale) {
       submit.textContent = copy.sending;
     }
 
-    window.setTimeout(() => {
+    const fieldValue = (selector: string) => form.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)?.value.trim() || "";
+
+    try {
+      const response = await fetch("/api/forms/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: fieldValue("input[name='name-1'], input[name='your-name']"),
+          email: fieldValue("input[name='email-1'], input[name='your-email']"),
+          subject: fieldValue("input[name='your-subject']") || "Website contact",
+          message: fieldValue("textarea[name='textarea-1'], textarea[name='your-message']"),
+          sourcePage: window.location.pathname,
+          language: locale,
+        }),
+      });
+      if (!response.ok) throw new Error("Submission failed");
       setMessage(copy.success);
       form.reset();
+    } catch {
+      setMessage(copy.required, true);
+    } finally {
       if (submit) {
         submit.disabled = false;
         submit.removeAttribute("aria-busy");
         submit.textContent = copy.submit;
       }
-    }, 250);
+    }
   };
 
   form.addEventListener("submit", onSubmit);
@@ -283,6 +306,8 @@ function applyVisualRepairs(root: HTMLElement) {
 }
 
 export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath: string }) {
+  const router = useRouter();
+
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
@@ -371,6 +396,37 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath
         cleanups.push(() => link.removeEventListener("click", onClick));
       });
 
+      root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
+        const href = link.getAttribute("href");
+        if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || link.target === "_blank") return;
+
+        let internalHref = "";
+        try {
+          const url = new URL(href, window.location.origin);
+          if (url.origin !== window.location.origin) return;
+          internalHref = `${url.pathname}${url.search}${url.hash}`;
+        } catch {
+          return;
+        }
+
+        const prefetch = () => router.prefetch(internalHref);
+        const navigate = (event: MouseEvent) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          router.push(internalHref);
+          closeMenus();
+        };
+
+        link.addEventListener("mouseenter", prefetch, { once: true });
+        link.addEventListener("focus", prefetch, { once: true });
+        link.addEventListener("click", navigate);
+        cleanups.push(() => {
+          link.removeEventListener("mouseenter", prefetch);
+          link.removeEventListener("focus", prefetch);
+          link.removeEventListener("click", navigate);
+        });
+      });
+
       const accordionButtons = Array.from(root.querySelectorAll<HTMLAnchorElement>(".ekit-accordion--toggler"));
       accordionButtons.forEach((button) => {
         const onClick = (event: MouseEvent) => {
@@ -409,7 +465,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath
       cleanups.forEach((cleanup) => cleanup());
       document.body.classList.remove("wp-clone-menu-open");
     };
-  }, [locale, pagePath]);
+  }, [locale, pagePath, router]);
 
   return null;
 }

@@ -1,0 +1,66 @@
+{
+  "title": {
+    "en": "Let's talk about your project",
+    "el": "Ας μιλήσουμε για το project σας"
+  },
+  "description": {
+    "en": "",
+    "el": ""
+  },
+  "fields": [
+    {
+      "name": "name-1",
+      "label": {
+        "en": "First Name",
+        "el": "Όνομα"
+      },
+      "placeholder": {
+        "en": "",
+        "el": ""
+      },
+      "required": true
+    },
+    {
+      "name": "email-1",
+      "label": {
+        "en": "Email Address",
+        "el": "Διεύθυνση Email"
+      },
+      "placeholder": {
+        "en": "",
+        "el": ""
+      },
+      "required": true
+    },
+    {
+      "name": "textarea-1",
+      "label": {
+        "en": "Message",
+        "el": "Μήνυμα"
+      },
+      "placeholder": {
+        "en": "",
+        "el": ""
+      },
+      "required": true
+    }
+  ],
+  "submitButtonText": {
+    "en": "Submit",
+    "el": "Αποστολή"
+  },
+  "successMessage": {
+    "en": "Thank you. Your message is ready to send.",
+    "el": "Ευχαριστούμε. Το μήνυμά σας είναι έτοιμο για αποστολή."
+  },
+  "errorMessage": {
+    "en": "This field is required.",
+    "el": "Το πεδίο είναι υποχρεωτικό."
+  },
+  "recipientEmail": "",
+  "consentCheckboxText": {
+    "en": "",
+    "el": ""
+  },
+  "privacyPolicyLink": ""
+}

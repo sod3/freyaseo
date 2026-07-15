@@ -1,0 +1,50 @@
+{
+  "name": "Claude",
+  "englishName": "Claude",
+  "greekName": "Claude",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/claude.png",
+  "logoAlt": {
+    "en": "Claude logo",
+    "el": "Claude logo"
+  },
+  "logoTitle": "Claude",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 7,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Claude",
+      "el": "Claude"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

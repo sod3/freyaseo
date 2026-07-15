@@ -1,0 +1,50 @@
+{
+  "name": "Semrush",
+  "englishName": "Semrush",
+  "greekName": "Semrush",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/semrush.svg",
+  "logoAlt": {
+    "en": "Semrush logo",
+    "el": "Semrush logo"
+  },
+  "logoTitle": "Semrush",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 4,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Semrush",
+      "el": "Semrush"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

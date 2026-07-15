@@ -1,0 +1,50 @@
+{
+  "name": "Google Trends",
+  "englishName": "Google Trends",
+  "greekName": "Google Trends",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/google-trends.png",
+  "logoAlt": {
+    "en": "Google Trends logo",
+    "el": "Google Trends logo"
+  },
+  "logoTitle": "Google Trends",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 9,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Google Trends",
+      "el": "Google Trends"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

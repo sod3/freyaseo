@@ -1,0 +1,51 @@
+{
+  "title": "Get found by Google, AI search and the customers ready to choose.",
+  "greekTitle": "Να σας βρίσκουν στη Google, στο AI search και οι πελάτες που είναι έτοιμοι να επιλέξουν.",
+  "greekSlug": "/el/ai-seo-4/",
+  "language": "en",
+  "shortDescription": {
+    "en": "Search is not just a Google box anymore. We help your brand become clear, useful and discoverable across classic search and AI answers.",
+    "el": "Η αναζήτηση δεν είναι πια μόνο ένα πεδίο Google. Βοηθάμε το brand σας να είναι καθαρό, χρήσιμο και ορατό σε κλασική αναζήτηση και AI απαντήσεις."
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "icon": "aiSeo",
+  "featuredImage": null,
+  "tools": [
+    "google-search-console",
+    "google-analytics-4",
+    "ahrefs",
+    "semrush",
+    "screaming-frog",
+    "chatgpt",
+    "claude",
+    "gemini",
+    "google-trends",
+    "bigquery",
+    "python"
+  ],
+  "faqs": [],
+  "tags": [
+    "ai-seo"
+  ],
+  "displayOrder": 1,
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "",
+      "el": ""
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "canonicalUrl": "/ai-seo-2/",
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "Service",
+    "author": "Pavlina Hörmann",
+    "customMeta": []
+  }
+}

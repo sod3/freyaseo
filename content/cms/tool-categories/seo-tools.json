@@ -1,0 +1,22 @@
+{
+  "name": "SEO Tools",
+  "greekName": "Εργαλεία SEO",
+  "description": {
+    "en": "Tools used across SEO, reporting, automation and custom systems.",
+    "el": ""
+  },
+  "language": "en",
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "SEO Tools",
+      "el": ""
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": false,
+    "robotsFollow": true
+  }
+}

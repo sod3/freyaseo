@@ -1,0 +1,30 @@
+{
+  "name": "Pavlina Hörmann",
+  "role": {
+    "en": "SEO Manager and AI Marketer",
+    "el": "SEO Manager και AI Marketer"
+  },
+  "bio": {
+    "en": "",
+    "el": ""
+  },
+  "image": null,
+  "imageAlt": {
+    "en": "Pavlina Hörmann",
+    "el": "Pavlina Hörmann"
+  },
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "Pavlina Hörmann",
+      "el": "Pavlina Hörmann"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "customMeta": []
+  }
+}

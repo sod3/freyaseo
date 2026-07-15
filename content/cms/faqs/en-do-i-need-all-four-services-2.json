@@ -1,0 +1,14 @@
+{
+  "question": "Do I need all four services?",
+  "greekQuestion": "",
+  "answer": {
+    "en": "No. Many projects start with AI SEO or reporting, then add automation or custom tools once the priorities are clearer.",
+    "el": ""
+  },
+  "category": "General",
+  "relatedService": null,
+  "relatedPage": null,
+  "tags": [],
+  "displayOrder": 2,
+  "active": true
+}

@@ -1,0 +1,14 @@
+{
+  "question": "Χρειάζομαι και τις τέσσερις υπηρεσίες;",
+  "greekQuestion": "Χρειάζομαι και τις τέσσερις υπηρεσίες;",
+  "answer": {
+    "en": "",
+    "el": "Όχι. Πολλά projects ξεκινούν με AI SEO ή αναφορές και προσθέτουν αυτοματισμούς ή custom εργαλεία όταν ξεκαθαρίσουν οι προτεραιότητες."
+  },
+  "category": "General",
+  "relatedService": null,
+  "relatedPage": null,
+  "tags": [],
+  "displayOrder": 6,
+  "active": true
+}

@@ -96,6 +96,7 @@ export type BlogPost = {
   readingTime: string;
   publicationDate: string;
   author: string;
+  bodyHtml?: string;
   content: Array<{
     heading: string;
     body: string[];

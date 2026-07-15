@@ -1,0 +1,23 @@
+{
+  "name": "SEO Strategy",
+  "greekName": "SEO Strategy",
+  "description": {
+    "en": "",
+    "el": ""
+  },
+  "language": "en",
+  "indexArchive": true,
+  "seo": {
+    "title": {
+      "en": "SEO Strategy",
+      "el": "SEO Strategy"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "customMeta": []
+  }
+}

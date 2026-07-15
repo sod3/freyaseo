@@ -1,0 +1,102 @@
+{
+  "logo": null,
+  "description": {
+    "en": "Freya SEO helps businesses improve visibility across Google, AI search and organic growth channels.",
+    "el": "Η Freya SEO βοηθά επιχειρήσεις να βελτιώσουν την ορατότητά τους σε Google, AI search και οργανικά κανάλια."
+  },
+  "quickLinks": [
+    {
+      "label": {
+        "en": "About",
+        "el": "Σχετικά"
+      },
+      "url": "/about/",
+      "target": "_self",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "Contact",
+        "el": "Επικοινωνία"
+      },
+      "url": "/contact-2/",
+      "target": "_self",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "Blog",
+        "el": "Blog"
+      },
+      "url": "/blog/",
+      "target": "_self",
+      "nofollow": false
+    }
+  ],
+  "serviceLinks": [
+    {
+      "label": {
+        "en": "AI SEO",
+        "el": "AI SEO"
+      },
+      "url": "/ai-seo-2/",
+      "target": "_self",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "Automation",
+        "el": "Αυτοματισμοί"
+      },
+      "url": "/automation/",
+      "target": "_self",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "Reporting",
+        "el": "Αναφορές"
+      },
+      "url": "/report/",
+      "target": "_self",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "Tool Generation",
+        "el": "Δημιουργία Εργαλείων"
+      },
+      "url": "/tool-generation/",
+      "target": "_self",
+      "nofollow": false
+    }
+  ],
+  "legalLinks": [],
+  "socialLinks": [
+    {
+      "label": {
+        "en": "Instagram",
+        "el": "Instagram"
+      },
+      "url": "https://www.instagram.com/freyaseo",
+      "target": "_blank",
+      "nofollow": false
+    },
+    {
+      "label": {
+        "en": "LinkedIn",
+        "el": "LinkedIn"
+      },
+      "url": "https://www.linkedin.com/company/freya-seo",
+      "target": "_blank",
+      "nofollow": false
+    }
+  ],
+  "email": "",
+  "phone": "",
+  "address": "",
+  "copyright": {
+    "en": "© Freya SEO. All rights reserved.",
+    "el": "© Freya SEO. All rights reserved."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "AI SEO",
+  "greekName": "AI SEO",
+  "description": {
+    "en": "",
+    "el": ""
+  },
+  "language": "en",
+  "indexArchive": true,
+  "seo": {
+    "title": {
+      "en": "AI SEO",
+      "el": "AI SEO"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "customMeta": []
+  }
+}

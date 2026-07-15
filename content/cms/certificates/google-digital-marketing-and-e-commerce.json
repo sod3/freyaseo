@@ -1,0 +1,21 @@
+{
+  "title": "Google Digital Marketing & E-commerce",
+  "issuer": "Google & Coursera",
+  "image": null,
+  "imageAlt": {
+    "en": "Google Digital Marketing & E-commerce",
+    "el": "Google Digital Marketing & E-commerce"
+  },
+  "credentialUrl": "https://www.coursera.org/",
+  "issueDate": "2026-01-01",
+  "expiryDate": null,
+  "description": {
+    "en": "Digital Marketing",
+    "el": "Digital Marketing"
+  },
+  "tags": [
+    "digital-marketing"
+  ],
+  "displayOrder": 1,
+  "active": true
+}

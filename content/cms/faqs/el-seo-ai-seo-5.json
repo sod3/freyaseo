@@ -1,0 +1,14 @@
+{
+  "question": "Ποια είναι η διαφορά ανάμεσα στο κανονικό SEO και το AI SEO;",
+  "greekQuestion": "Ποια είναι η διαφορά ανάμεσα στο κανονικό SEO και το AI SEO;",
+  "answer": {
+    "en": "",
+    "el": "Το κανονικό SEO σας κάνει ορατούς σε μηχανές όπως η Google. Το AI SEO βοηθά και εργαλεία όπως ChatGPT, Gemini και Perplexity να κατανοούν και να προτείνουν την επιχείρησή σας."
+  },
+  "category": "General",
+  "relatedService": null,
+  "relatedPage": null,
+  "tags": [],
+  "displayOrder": 5,
+  "active": true
+}

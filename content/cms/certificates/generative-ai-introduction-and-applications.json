@@ -1,0 +1,21 @@
+{
+  "title": "Generative AI: Introduction and Applications",
+  "issuer": "IBM",
+  "image": null,
+  "imageAlt": {
+    "en": "Generative AI: Introduction and Applications",
+    "el": "Generative AI: Introduction and Applications"
+  },
+  "credentialUrl": "https://www.coursera.org/",
+  "issueDate": "2026-01-01",
+  "expiryDate": null,
+  "description": {
+    "en": "Artificial Intelligence",
+    "el": "Artificial Intelligence"
+  },
+  "tags": [
+    "artificial-intelligence"
+  ],
+  "displayOrder": 4,
+  "active": true
+}

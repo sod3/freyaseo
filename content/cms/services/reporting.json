@@ -1,0 +1,49 @@
+{
+  "title": "One screen for the numbers that actually guide better decisions.",
+  "greekTitle": "Μία οθόνη για τους αριθμούς που οδηγούν σε καλύτερες αποφάσεις.",
+  "greekSlug": "/el/report-2/",
+  "language": "en",
+  "shortDescription": {
+    "en": "We turn scattered SEO, marketing and sales data into dashboards and reports your team can understand without a spreadsheet headache.",
+    "el": "Μετατρέπουμε διάσπαρτα SEO, marketing και sales δεδομένα σε dashboards και αναφορές που η ομάδα καταλαβαίνει χωρίς πονοκέφαλο από spreadsheets."
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "icon": "reporting",
+  "featuredImage": null,
+  "tools": [
+    "looker-studio",
+    "power-bi",
+    "bigquery",
+    "sql",
+    "python",
+    "google-analytics",
+    "google-search-console",
+    "google-sheets",
+    "custom-api-integrations"
+  ],
+  "faqs": [],
+  "tags": [
+    "reporting"
+  ],
+  "displayOrder": 3,
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "",
+      "el": ""
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "canonicalUrl": "/report/",
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "Service",
+    "author": "Pavlina Hörmann",
+    "customMeta": []
+  }
+}

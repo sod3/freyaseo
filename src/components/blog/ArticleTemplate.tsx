@@ -47,14 +47,18 @@ export function ArticleTemplate({ post }: { post: BlogPost }) {
         </Container>
         <Section>
           <Container className="article-content">
-            {post.content.map((section) => (
-              <section key={section.heading}>
-                <h2>{section.heading}</h2>
-                {section.body.map((paragraph) => (
-                  <p key={paragraph}>{paragraph}</p>
-                ))}
-              </section>
-            ))}
+            {post.bodyHtml ? (
+              <div dangerouslySetInnerHTML={{ __html: post.bodyHtml }} />
+            ) : (
+              post.content.map((section) => (
+                <section key={section.heading}>
+                  <h2>{section.heading}</h2>
+                  {section.body.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </section>
+              ))
+            )}
             <Link className="button button-secondary mt-8" href={base}>
               {locale === "el" ? "Πίσω στο Blog" : "Back to Blog"}
             </Link>

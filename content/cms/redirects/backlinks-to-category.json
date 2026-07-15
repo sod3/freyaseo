@@ -1,0 +1,8 @@
+{
+  "name": "Backlinks legacy category",
+  "sourceUrl": "/backlinks/",
+  "destinationUrl": "/category/backlinks/",
+  "permanent": true,
+  "active": true,
+  "notes": "Preserves the legacy link normalization already used by the frontend behavior script."
+}

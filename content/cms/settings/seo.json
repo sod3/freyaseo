@@ -1,0 +1,56 @@
+{
+  "defaults": {
+    "title": {
+      "en": "Rank First on Google & AI | Multilingual SEO Agency - Freya SEO",
+      "el": "Εταιρεία SEO για Google & AI | Freya SEO"
+    },
+    "description": {
+      "en": "Freya SEO builds AI-powered SEO, automation, reporting and custom tools for businesses that want measurable organic growth.",
+      "el": "Η Freya SEO δημιουργεί AI-powered SEO, αυτοματισμούς, αναφορές και custom εργαλεία για μετρήσιμη οργανική ανάπτυξη."
+    },
+    "focusKeyword": "",
+    "secondaryKeywords": [],
+    "canonicalUrl": "",
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "archive": true,
+    "snippet": true,
+    "openGraphTitle": {
+      "en": "Freya SEO",
+      "el": "Freya SEO"
+    },
+    "openGraphDescription": {
+      "en": "",
+      "el": ""
+    },
+    "openGraphImage": null,
+    "openGraphImageAlt": {
+      "en": "Freya SEO",
+      "el": "Freya SEO"
+    },
+    "twitterTitle": {
+      "en": "Freya SEO",
+      "el": "Freya SEO"
+    },
+    "twitterDescription": {
+      "en": "",
+      "el": ""
+    },
+    "twitterImage": null,
+    "twitterCardType": "summary_large_image",
+    "breadcrumbTitle": {
+      "en": "Freya SEO",
+      "el": "Freya SEO"
+    },
+    "schemaType": "WebPage",
+    "publishDate": "2026-07-14",
+    "modifiedDate": "2026-07-14",
+    "author": "Pavlina Hörmann",
+    "redirectUrl": "",
+    "customMeta": []
+  },
+  "organizationSchemaEnabled": true,
+  "professionalServiceSchemaEnabled": true,
+  "websiteSchemaEnabled": true,
+  "breadcrumbSchemaEnabled": true
+}

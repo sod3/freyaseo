@@ -1,6 +1,8 @@
 # Freya SEO Next Frontend
 
-Production-quality bilingual frontend rebuild for Freya SEO, implemented with Next.js App Router-compatible Vinext, TypeScript, Tailwind CSS, Framer Motion, Recharts, Lucide React and local content files.
+Production bilingual Freya SEO website built with Next.js App Router, TypeScript, Tailwind CSS, Framer Motion, Recharts and Lucide React.
+
+The public website design is preserved through the existing WordPress-clone HTML snapshots and structured React components. The private CMS is now a custom in-app admin system at `/admin`, backed by MongoDB.
 
 ## Commands
 
@@ -8,12 +10,19 @@ Production-quality bilingual frontend rebuild for Freya SEO, implemented with Ne
 npm install
 npm run dev
 npm run lint
+npm run typecheck
 npm run build
 ```
 
-The local development server prints its available URL. In this workspace it is currently running at `http://localhost:3001/`.
+Database commands:
 
-## Implemented Routes
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+```
+
+## Public Routes
 
 English:
 
@@ -43,19 +52,43 @@ Greek:
 - `/el/seo-blog/[slug]/`
 - `/el/lets-contact/`
 
-## Content Editing
+## Custom CMS
 
-- Shared labels and contact strings: `src/content/common/`
-- Navigation and service dropdowns: `src/content/navigation.ts`
-- Route equivalents and hreflang helpers: `src/content/route-map.ts`
-- Service landing and service pages: `src/content/services.ts`
-- Home and about pages: `src/content/pages/`
-- Blog posts: `src/content/blog/`
-- Certificates: `src/content/certificates.ts`
+The private CMS is available at:
+
+```text
+/admin
+```
+
+Admin routes are protected, no-indexed, excluded from robots, and backed by secure HTTP-only session cookies. The CMS supports database records for pages, page sections, blog posts, services, tools, certificates, FAQs, media, navigation, footer/settings, SEO metadata, redirects, form submissions, users, roles, sessions, revisions and audit logs.
+
+Required environment variables are listed in `.env.example`. At minimum, production needs:
+
+```env
+MONGODB_URI=
+MONGODB_DB=
+AUTH_SECRET=
+INITIAL_ADMIN_EMAIL=
+INITIAL_ADMIN_PASSWORD=
+NEXT_PUBLIC_SITE_URL=
+```
+
+Uploads must use persistent storage. On Vercel or other ephemeral runtimes, configure the S3-compatible variables in `.env.example`.
+
+## Migration Source
+
+`content/cms/` is the repeatable migration source generated from the current website content. Run:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+The seed imports existing pages, HTML snapshots, SEO metadata, blog posts, tools, services, media references, certificates, FAQs, redirects, settings and the initial administrator. Public routes read from MongoDB first and only fall back to this migration source when database access is not configured.
 
 ## Assets
 
-Downloaded Freya SEO media lives under `public/images/`:
+Downloaded Freya SEO media lives under `public/images/` and `public/wp-clone/`:
 
 - Brand: `public/images/brand/`
 - Portrait/home media: `public/images/home/`
@@ -64,16 +97,24 @@ Downloaded Freya SEO media lives under `public/images/`:
 - Tool logos: `public/images/tools/`
 - Social preview: `public/og.png`
 
-Certificate cards currently use polished local preview cards. Replace them with original certificate images later by adding image paths to `src/content/certificates.ts`.
+## Documentation
 
-## Backend-Ready Areas
+See:
 
-- Contact form validates locally and includes a TODO for future backend/email integration.
-- Blog content is local TypeScript and can later be swapped for WordPress REST API or WPGraphQL.
-- Service and page content is structured so CMS-backed data can replace local files without redesigning the UI.
-- No API secrets or backend connections are included.
+- `CUSTOM_CMS_GUIDE.md`
+- `ADMIN_USER_GUIDE.md`
+- `DEPLOYMENT_GUIDE.md`
+- `DATABASE_BACKUP_GUIDE.md`
+- `MEDIA_STORAGE_GUIDE.md`
+- `SECURITY_GUIDE.md`
+- `MIGRATION_REPORT.md`
 
 ## Validation
 
-- `npm run lint` passes.
-- `npm run build` passes.
+Before deployment, run:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```

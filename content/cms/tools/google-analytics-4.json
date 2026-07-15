@@ -1,0 +1,50 @@
+{
+  "name": "Google Analytics 4",
+  "englishName": "Google Analytics 4",
+  "greekName": "Google Analytics 4",
+  "shortDescription": {
+    "en": "",
+    "el": ""
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "logo": null,
+  "existingLogoPath": "/images/tools/google-analytics.svg",
+  "logoAlt": {
+    "en": "Google Analytics 4 logo",
+    "el": "Google Analytics 4 logo"
+  },
+  "logoTitle": "Google Analytics 4",
+  "imageCaption": {
+    "en": "",
+    "el": ""
+  },
+  "category": "seo-tools",
+  "tags": [],
+  "toolUrl": "",
+  "hasInternalDetailPage": false,
+  "featured": false,
+  "displayOrder": 2,
+  "publishDate": "2026-07-14",
+  "updatedDate": "2026-07-14",
+  "active": true,
+  "newBadge": false,
+  "featuredBadge": false,
+  "relatedServices": [],
+  "seo": {
+    "title": {
+      "en": "Google Analytics 4",
+      "el": "Google Analytics 4"
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "WebPage",
+    "customMeta": []
+  }
+}

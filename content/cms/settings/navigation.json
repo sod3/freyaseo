@@ -1,0 +1,156 @@
+{
+  "items": [
+    {
+      "label": {
+        "en": "Main Page",
+        "el": "Αρχική"
+      },
+      "mobileLabel": {
+        "en": "Main Page",
+        "el": "Αρχική"
+      },
+      "href": "/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 1,
+      "children": []
+    },
+    {
+      "label": {
+        "en": "Services",
+        "el": "Υπηρεσίες"
+      },
+      "mobileLabel": {
+        "en": "Services",
+        "el": "Υπηρεσίες"
+      },
+      "href": "/seo-marketing/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 2,
+      "children": [
+        {
+          "label": {
+            "en": "AI SEO",
+            "el": "AI SEO"
+          },
+          "url": "/ai-seo-2/",
+          "target": "_self",
+          "nofollow": false
+        },
+        {
+          "label": {
+            "en": "Automation",
+            "el": "Αυτοματισμοί"
+          },
+          "url": "/automation/",
+          "target": "_self",
+          "nofollow": false
+        },
+        {
+          "label": {
+            "en": "Reporting",
+            "el": "Αναφορές"
+          },
+          "url": "/report/",
+          "target": "_self",
+          "nofollow": false
+        },
+        {
+          "label": {
+            "en": "Tool Generation",
+            "el": "Δημιουργία Εργαλείων"
+          },
+          "url": "/tool-generation/",
+          "target": "_self",
+          "nofollow": false
+        }
+      ]
+    },
+    {
+      "label": {
+        "en": "SEO Certificates",
+        "el": "Πιστοποιήσεις SEO"
+      },
+      "mobileLabel": {
+        "en": "SEO Certificates",
+        "el": "Πιστοποιήσεις SEO"
+      },
+      "href": "/certificates/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 2,
+      "children": []
+    },
+    {
+      "label": {
+        "en": "About",
+        "el": "Σχετικά"
+      },
+      "mobileLabel": {
+        "en": "About",
+        "el": "Σχετικά"
+      },
+      "href": "/about/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 3,
+      "children": []
+    },
+    {
+      "label": {
+        "en": "Blog",
+        "el": "Blog"
+      },
+      "mobileLabel": {
+        "en": "Blog",
+        "el": "Blog"
+      },
+      "href": "/blog/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 4,
+      "children": [
+        {
+          "label": {
+            "en": "AI SEO",
+            "el": "AI SEO"
+          },
+          "url": "/ai-seo/",
+          "target": "_self",
+          "nofollow": false
+        },
+        {
+          "label": {
+            "en": "SEO Tips",
+            "el": "SEO Tips"
+          },
+          "url": "/seo-tips/",
+          "target": "_self",
+          "nofollow": false
+        }
+      ]
+    },
+    {
+      "label": {
+        "en": "Contact",
+        "el": "Επικοινωνία"
+      },
+      "mobileLabel": {
+        "en": "Contact",
+        "el": "Επικοινωνία"
+      },
+      "href": "/contact-2/",
+      "target": "_self",
+      "visibleInEnglish": true,
+      "visibleInGreek": true,
+      "order": 5,
+      "children": []
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "title": "Let smart systems handle the repetitive work your team should not have to carry.",
+  "greekTitle": "Αφήστε τα έξυπνα συστήματα να χειριστούν την επαναλαμβανόμενη δουλειά.",
+  "greekSlug": "/el/automation-2/",
+  "language": "en",
+  "shortDescription": {
+    "en": "We build AI-powered workflows for content, research, checks and handoffs so people can focus on judgment, creativity and customers.",
+    "el": "Χτίζουμε AI-powered workflows για περιεχόμενο, έρευνα, ελέγχους και handoffs, ώστε οι άνθρωποι να εστιάζουν στην κρίση, τη δημιουργικότητα και τους πελάτες."
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "icon": "automation",
+  "featuredImage": null,
+  "tools": [
+    "openai-api",
+    "chatgpt",
+    "claude",
+    "gemini",
+    "python",
+    "custom-api-integrations"
+  ],
+  "faqs": [],
+  "tags": [
+    "automation"
+  ],
+  "displayOrder": 2,
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "",
+      "el": ""
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "canonicalUrl": "/automation/",
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "Service",
+    "author": "Pavlina Hörmann",
+    "customMeta": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Google Project Management",
+  "issuer": "Google & Coursera",
+  "image": null,
+  "imageAlt": {
+    "en": "Google Project Management",
+    "el": "Google Project Management"
+  },
+  "credentialUrl": "https://www.coursera.org/",
+  "issueDate": "2026-01-01",
+  "expiryDate": null,
+  "description": {
+    "en": "Project Management",
+    "el": "Project Management"
+  },
+  "tags": [
+    "project-management"
+  ],
+  "displayOrder": 2,
+  "active": true
+}

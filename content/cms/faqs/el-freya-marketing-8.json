@@ -1,0 +1,14 @@
+{
+  "question": "Μπορεί η Freya να συνεργαστεί με την υπάρχουσα ομάδα marketing;",
+  "greekQuestion": "Μπορεί η Freya να συνεργαστεί με την υπάρχουσα ομάδα marketing;",
+  "answer": {
+    "en": "",
+    "el": "Ναι. Η Freya μπορεί να υποστηρίξει την ομάδα σας με στρατηγική, dashboards, audits, αυτοματισμούς και πρακτική υλοποίηση."
+  },
+  "category": "General",
+  "relatedService": null,
+  "relatedPage": null,
+  "tags": [],
+  "displayOrder": 8,
+  "active": true
+}

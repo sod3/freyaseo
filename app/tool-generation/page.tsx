@@ -1,11 +1,12 @@
-﻿import type { Metadata } from "next";
-import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
-import { wpClonePages } from "@/src/content/wp-clone/pages";
+import type { Metadata } from "next";
+import { generateWpCloneMetadata, WpClonePageForPath } from "@/src/lib/cms/wp-pages";
 
-const page = wpClonePages["en_tool_generation"];
+const pathname = "/tool-generation/";
 
-export const metadata: Metadata = metadataForWpClonePage(page);
+export function generateMetadata(): Promise<Metadata> {
+  return generateWpCloneMetadata(pathname);
+}
 
-export default function Page() {
-  return <WpClonePage page={page} />;
+export default async function Page() {
+  return <WpClonePageForPath pathname={pathname} />;
 }

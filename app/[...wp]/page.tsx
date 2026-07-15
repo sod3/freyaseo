@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { WpClonePage, metadataForWpClonePage } from "@/src/components/wp-clone/WpClonePage";
-import { getWpClonePageByPath, wpClonePagesByPath } from "@/src/content/wp-clone/pages";
+import {
+  generateWpCloneMetadata,
+  getAllWpClonePagePaths,
+  getCmsWpClonePageByPath,
+  redirectFromCmsIfNeeded,
+  WpClonePageForPath,
+} from "@/src/lib/cms/wp-pages";
 
 const directRoutePaths = new Set([
   "/",
@@ -47,8 +52,10 @@ function safeDecode(value: string) {
   }
 }
 
-export function generateStaticParams() {
-  return Object.keys(wpClonePagesByPath)
+export async function generateStaticParams() {
+  const paths = await getAllWpClonePagePaths();
+
+  return paths
     .filter((path) => !directRoutePaths.has(path))
     .map((path) => ({
       wp: path.split("/").filter(Boolean).map(safeDecode),
@@ -57,22 +64,19 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { wp = [] } = await params;
-  const page = getWpClonePageByPath(toPath(wp));
-
-  if (!page) {
-    return {};
-  }
-
-  return metadataForWpClonePage(page);
+  return generateWpCloneMetadata(toPath(wp));
 }
 
 export default async function Page({ params }: PageProps) {
   const { wp = [] } = await params;
-  const page = getWpClonePageByPath(toPath(wp));
+  const pathname = toPath(wp);
+
+  await redirectFromCmsIfNeeded(pathname);
+  const page = await getCmsWpClonePageByPath(pathname);
 
   if (!page) {
     notFound();
   }
 
-  return <WpClonePage page={page} />;
+  return <WpClonePageForPath pathname={pathname} />;
 }

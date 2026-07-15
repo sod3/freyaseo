@@ -35,9 +35,7 @@
   "exclude": [
     "node_modules",
     "build",
-    "db",
     "dist",
-    "drizzle",
     "worker",
     "work",
     ".vinext",

@@ -1,0 +1,48 @@
+{
+  "title": "Custom tools for workflows that off-the-shelf software cannot solve.",
+  "greekTitle": "Custom εργαλεία για workflows που τα έτοιμα λογισμικά δεν μπορούν να λύσουν.",
+  "greekSlug": "/el/tool-generation-2/",
+  "language": "en",
+  "shortDescription": {
+    "en": "We build focused internal tools, SEO utilities and API-connected systems around the way your business actually works.",
+    "el": "Χτίζουμε εστιασμένα internal tools, SEO utilities και API-connected συστήματα γύρω από τον τρόπο που λειτουργεί πραγματικά η επιχείρησή σας."
+  },
+  "fullDescription": {
+    "en": "",
+    "el": ""
+  },
+  "icon": "toolGeneration",
+  "featuredImage": null,
+  "tools": [
+    "python",
+    "sql",
+    "javascript",
+    "rest-apis",
+    "docker",
+    "github",
+    "aws",
+    "google-cloud"
+  ],
+  "faqs": [],
+  "tags": [
+    "tool-generation"
+  ],
+  "displayOrder": 4,
+  "active": true,
+  "seo": {
+    "title": {
+      "en": "",
+      "el": ""
+    },
+    "description": {
+      "en": "",
+      "el": ""
+    },
+    "canonicalUrl": "/tool-generation/",
+    "robotsIndex": true,
+    "robotsFollow": true,
+    "schemaType": "Service",
+    "author": "Pavlina Hörmann",
+    "customMeta": []
+  }
+}
