@@ -28,8 +28,26 @@ export type DashboardData = {
     missingAltText: number;
     submissions: number;
   };
+  recentSubmissions: FormSubmissionRecord[];
   recentActivity: AdminRecord[];
   warnings: string[];
+};
+
+export type FormSubmissionRecord = {
+  id: string;
+  formKey: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  service: string;
+  budget: string;
+  subject: string;
+  message: string;
+  sourcePage: string;
+  language: string;
+  submittedAt?: Date | null;
+  payload: Record<string, string>;
 };
 
 export type AdminPageInfo = {
@@ -52,6 +70,42 @@ function statusLabel(value?: string | null) {
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/^\w/, (char) => char.toUpperCase());
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function payloadValue(payload: Record<string, unknown>, key: string) {
+  return stringValue(payload[key]);
+}
+
+function formPayload(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function mapFormSubmission(submission: Record<string, unknown>): FormSubmissionRecord {
+  const payload = formPayload(submission.payload);
+  const firstName = stringValue(submission.firstName) || payloadValue(payload, "firstName");
+  const lastName = stringValue(submission.lastName) || payloadValue(payload, "lastName");
+  const fallbackName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return {
+    id: documentId(submission),
+    formKey: stringValue(submission.formKey) || "contact",
+    name: stringValue(submission.name) || payloadValue(payload, "name") || fallbackName,
+    email: stringValue(submission.email) || payloadValue(payload, "email"),
+    phone: stringValue(submission.phone) || payloadValue(payload, "phone"),
+    company: stringValue(submission.company) || payloadValue(payload, "company"),
+    service: stringValue(submission.service) || payloadValue(payload, "service"),
+    budget: stringValue(submission.budget) || payloadValue(payload, "budget"),
+    subject: stringValue(submission.subject) || payloadValue(payload, "subject"),
+    message: stringValue(submission.message) || payloadValue(payload, "message"),
+    sourcePage: stringValue(submission.sourcePage) || payloadValue(payload, "sourcePage"),
+    language: stringValue(submission.language) || payloadValue(payload, "language"),
+    submittedAt: submission.createdAt instanceof Date ? submission.createdAt : null,
+    payload: Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, stringValue(value)])),
+  };
 }
 
 function filterRecords(records: AdminRecord[], search?: string, language?: string, status?: string) {
@@ -153,6 +207,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         missingAltText: 0,
         submissions: 0,
       },
+      recentSubmissions: [],
       recentActivity: [],
       warnings: ["MongoDB is not configured yet. Add MONGODB_URI, run the seed command, then sign in."],
     };
@@ -181,6 +236,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     blogMissingSeo,
     mediaMissingAlt,
     recentAuditLogs,
+    recentFormSubmissions,
   ] = await Promise.all([
     pages.countDocuments({}),
     blogPosts.countDocuments({}),
@@ -209,6 +265,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     blogPosts.countDocuments(missingLocalizedObjectFilter("seo.description")),
     mediaAssets.countDocuments({ decorative: { $ne: true }, ...missingLocalizedObjectFilter("alt") }),
     auditLogs.find({}).sort({ createdAt: -1 }).limit(6).toArray(),
+    formSubmissions.find({ deletedAt: { $ne: true } }).sort({ createdAt: -1 }).limit(8).toArray(),
   ]);
   const published = publishedPages + publishedBlogPosts;
   const drafts = pageCount + blogPostCount - published;
@@ -229,6 +286,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       missingAltText: mediaMissingAlt,
       submissions: formSubmissionsCount,
     },
+    recentSubmissions: recentFormSubmissions.map((submission) => mapFormSubmission(submission as Record<string, unknown>)),
     recentActivity: recentAuditLogs.map((log) => ({
       id: documentId(log),
       title: String(log.entityName || log.entityType || "Activity"),

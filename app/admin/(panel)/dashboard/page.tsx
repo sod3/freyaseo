@@ -3,6 +3,26 @@ import { AlertTriangle, Plus } from "lucide-react";
 import { getDashboardData } from "@/src/lib/admin/queries";
 import { quickCreateModules } from "@/src/lib/admin/modules";
 
+function submissionDetails(item: {
+  phone: string;
+  company: string;
+  service: string;
+  budget: string;
+  subject: string;
+  sourcePage: string;
+  language: string;
+}) {
+  return [
+    item.phone ? `Phone: ${item.phone}` : "",
+    item.company ? `Company: ${item.company}` : "",
+    item.service ? `Service: ${item.service}` : "",
+    item.budget ? `Budget: ${item.budget}` : "",
+    item.subject ? `Subject: ${item.subject}` : "",
+    item.sourcePage ? `Page: ${item.sourcePage}` : "",
+    item.language ? `Language: ${item.language.toUpperCase()}` : "",
+  ].filter(Boolean);
+}
+
 export default async function AdminDashboardPage() {
   const dashboard = await getDashboardData();
   const stats = [
@@ -59,6 +79,42 @@ export default async function AdminDashboardPage() {
           ))
         ) : (
           <p className="admin-muted">No content health warnings right now.</p>
+        )}
+      </section>
+
+      <section className="admin-panel">
+        <h2>Recent form submissions</h2>
+        {dashboard.recentSubmissions.length ? (
+          <div className="admin-submission-list">
+            {dashboard.recentSubmissions.map((item) => {
+              const details = submissionDetails(item);
+              return (
+                <article className="admin-submission-card" key={item.id}>
+                  <div>
+                    <strong>{item.name || "Unknown visitor"}</strong>
+                    <div className="admin-muted">{item.email || "No email provided"}</div>
+                  </div>
+                  {details.length ? (
+                    <dl className="admin-submission-details">
+                      {details.map((detail) => {
+                        const [label, ...value] = detail.split(": ");
+                        return (
+                          <div key={detail}>
+                            <dt>{label}</dt>
+                            <dd>{value.join(": ")}</dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  ) : null}
+                  {item.message ? <p className="admin-submission-message">{item.message}</p> : null}
+                  <div className="admin-muted">{item.submittedAt?.toLocaleString() || ""}</div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="admin-muted">No form submissions have been received yet.</p>
         )}
       </section>
 

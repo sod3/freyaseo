@@ -272,6 +272,50 @@
   gap: 8px;
 }
 
+.admin-submission-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-submission-card {
+  border: 1px solid #eef2ec;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.admin-submission-details {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0;
+}
+
+.admin-submission-details div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-submission-details dt {
+  color: #526057;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-submission-details dd {
+  margin: 0;
+}
+
+.admin-submission-message {
+  background: #f8faf7;
+  border-radius: 6px;
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
 .admin-shortcut-grid {
   display: grid;
   gap: 10px;

@@ -31,10 +31,13 @@ export function ContactForm({ locale }: { locale: Locale }) {
   const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const update = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
+    setSubmitError("");
   };
 
   const validate = () => {
@@ -47,14 +50,46 @@ export function ContactForm({ locale }: { locale: Locale }) {
     return next;
   };
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const next = validate();
     setErrors(next);
+    setSubmitted(false);
+    setSubmitError("");
     if (Object.keys(next).length || form.website) return;
-    // TODO: Connect this validated payload to the future backend/email integration.
-    setSubmitted(true);
-    setForm(initialState);
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/forms/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          name: `${form.firstName} ${form.lastName}`.trim(),
+          email: form.email,
+          company: form.company,
+          service: form.service,
+          budget: form.budget,
+          subject: form.service || "Website contact",
+          message: form.message,
+          sourcePage: window.location.pathname,
+          language: locale,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.ok === false) {
+        throw new Error(result?.message || "Please check the form and try again.");
+      }
+      setSubmitted(true);
+      setForm(initialState);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Please check the form and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const field = (
@@ -71,6 +106,7 @@ export function ContactForm({ locale }: { locale: Locale }) {
         onChange={(event) => update(name, event.target.value)}
         aria-invalid={Boolean(errors[name])}
         aria-describedby={errors[name] ? `${name}-error` : undefined}
+        required={required}
       />
       {errors[name] ? <small id={`${name}-error`}>{errors[name]}</small> : null}
     </label>
@@ -124,10 +160,11 @@ export function ContactForm({ locale }: { locale: Locale }) {
         Website
         <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(event) => update("website", event.target.value)} />
       </label>
-      <button className="button button-primary justify-center" type="submit">
+      <button className="button button-primary justify-center" type="submit" disabled={submitting}>
         {contact.labels.submit}
       </button>
       {submitted ? <p className="success-message">{contact.success}</p> : null}
+      {submitError ? <p className="success-message" role="alert">{submitError}</p> : null}
     </form>
   );
 }
