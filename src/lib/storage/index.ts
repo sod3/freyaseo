@@ -59,6 +59,11 @@ function cloudinaryConfig() {
   };
 }
 
+function hasCloudinaryConfig() {
+  const { cloudName, apiKey, apiSecret } = cloudinaryConfig();
+  return Boolean(cloudName && apiKey && apiSecret);
+}
+
 function cloudinarySignature(params: Record<string, string | number>, apiSecret: string) {
   const signatureBase = Object.entries(params)
     .filter(([, value]) => value !== "")
@@ -200,7 +205,14 @@ export async function saveUpload(file: File) {
   } else if (driver === "cloudinary") {
     stored = await uploadCloudinary(file, fileName);
   } else if (driver === "s3") {
-    stored = await uploadS3(file, fileName, bytes);
+    try {
+      stored = await uploadS3(file, fileName, bytes);
+    } catch (error) {
+      if (!hasCloudinaryConfig()) throw error;
+      stored = await uploadCloudinary(file, fileName);
+    }
+  } else if (hasCloudinaryConfig()) {
+    stored = await uploadCloudinary(file, fileName);
   } else {
     throw new Error(`Unsupported CMS_STORAGE_DRIVER "${driver}". Use "s3", "cloudinary", or "local".`);
   }
