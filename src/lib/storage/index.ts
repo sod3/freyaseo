@@ -17,8 +17,12 @@ const allowedMimeTypes = new Set([
 
 const maxUploadBytes = 10 * 1024 * 1024;
 
+function envValue(value: string | undefined) {
+  return (value || "").trim().replace(/^(['"])(.*)\1$/, "$2");
+}
+
 function storageDriver() {
-  return (process.env.CMS_STORAGE_DRIVER || "s3").toLowerCase();
+  return (envValue(process.env.CMS_STORAGE_DRIVER) || "s3").toLowerCase();
 }
 
 function decodeCloudinaryUrlPart(value: string) {
@@ -30,10 +34,11 @@ function decodeCloudinaryUrlPart(value: string) {
 }
 
 function cloudinaryConfig() {
-  const parsed = process.env.CLOUDINARY_URL
+  const cloudinaryUrl = envValue(process.env.CLOUDINARY_URL);
+  const parsed = cloudinaryUrl
     ? (() => {
         try {
-          const url = new URL(process.env.CLOUDINARY_URL || "");
+          const url = new URL(cloudinaryUrl);
           if (url.protocol !== "cloudinary:") return {};
           return {
             cloudName: url.hostname,
@@ -47,10 +52,10 @@ function cloudinaryConfig() {
     : {};
 
   return {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME || parsed.cloudName,
-    apiKey: process.env.CLOUDINARY_API_KEY || parsed.apiKey,
-    apiSecret: process.env.CLOUDINARY_API_SECRET || parsed.apiSecret,
-    folder: process.env.CLOUDINARY_FOLDER || "cms",
+    cloudName: envValue(process.env.CLOUDINARY_CLOUD_NAME) || parsed.cloudName,
+    apiKey: envValue(process.env.CLOUDINARY_API_KEY) || parsed.apiKey,
+    apiSecret: envValue(process.env.CLOUDINARY_API_SECRET) || parsed.apiSecret,
+    folder: envValue(process.env.CLOUDINARY_FOLDER) || "cms",
   };
 }
 
@@ -107,17 +112,17 @@ async function uploadLocal(file: File, fileName: string, bytes: Buffer) {
 }
 
 async function uploadS3(file: File, fileName: string, bytes: Buffer) {
-  const bucket = process.env.S3_BUCKET;
-  const endpoint = process.env.S3_ENDPOINT;
-  const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  const bucket = envValue(process.env.S3_BUCKET);
+  const endpoint = envValue(process.env.S3_ENDPOINT);
+  const publicBaseUrl = envValue(process.env.S3_PUBLIC_BASE_URL);
+  const accessKeyId = envValue(process.env.S3_ACCESS_KEY_ID);
+  const secretAccessKey = envValue(process.env.S3_SECRET_ACCESS_KEY);
   if (!bucket || !endpoint || !publicBaseUrl || !accessKeyId || !secretAccessKey) {
     throw new Error("S3-compatible storage is not configured.");
   }
 
   const client = new S3Client({
-    region: process.env.S3_REGION || "auto",
+    region: envValue(process.env.S3_REGION) || "auto",
     endpoint,
     forcePathStyle: true,
     credentials: {
@@ -189,12 +194,16 @@ export async function saveUpload(file: File) {
   const fileName = safeFileName(file.name);
   const bytes = Buffer.from(await file.arrayBuffer());
   const driver = storageDriver();
-  const stored =
-    driver === "local"
-      ? await uploadLocal(file, fileName, bytes)
-      : driver === "cloudinary"
-        ? await uploadCloudinary(file, fileName)
-        : await uploadS3(file, fileName, bytes);
+  let stored;
+  if (driver === "local") {
+    stored = await uploadLocal(file, fileName, bytes);
+  } else if (driver === "cloudinary") {
+    stored = await uploadCloudinary(file, fileName);
+  } else if (driver === "s3") {
+    stored = await uploadS3(file, fileName, bytes);
+  } else {
+    throw new Error(`Unsupported CMS_STORAGE_DRIVER "${driver}". Use "s3", "cloudinary", or "local".`);
+  }
 
   return {
     ...stored,
