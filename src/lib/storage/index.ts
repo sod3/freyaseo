@@ -17,6 +17,23 @@ const allowedMimeTypes = new Set([
 
 const maxUploadBytes = 10 * 1024 * 1024;
 
+type StorageUploadErrorCode = "configuration" | "permission" | "provider";
+
+export class StorageUploadError extends Error {
+  readonly code: StorageUploadErrorCode;
+  readonly status: number;
+
+  constructor(message: string, options: { code?: StorageUploadErrorCode; status?: number; cause?: unknown } = {}) {
+    super(message);
+    this.name = "StorageUploadError";
+    this.code = options.code || "provider";
+    this.status = options.status || 502;
+    if (options.cause) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
+}
+
 function envValue(value: string | undefined) {
   return (value || "").trim().replace(/^(['"])(.*)\1$/, "$2");
 }
@@ -73,6 +90,25 @@ function cloudinarySignature(params: Record<string, string | number>, apiSecret:
   return crypto.createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
 }
 
+function messageFromError(error: unknown) {
+  return error instanceof Error ? error.message : String(error || "Upload failed.");
+}
+
+function looksLikePermissionError(message: string) {
+  return /access\s*denied|forbidden|missing permissions?|not authorized|not authorised|permission/i.test(message);
+}
+
+function cloudinaryUploadErrorMessage(message: string, status: number) {
+  const rawMessage = message.trim() || "Cloudinary upload failed.";
+  if (/missing permissions?/i.test(rawMessage) && /\bcreate\b/i.test(rawMessage)) {
+    return "Cloudinary rejected the upload because the configured API key is missing asset create/upload permission. Use a Cloudinary API key that can create assets in this product environment, update the Cloudinary environment variables in Vercel, then redeploy.";
+  }
+  if (status === 401 || status === 403 || looksLikePermissionError(rawMessage)) {
+    return "Cloudinary rejected the upload credentials. Check that the configured cloud name, API key and API secret belong to the same Cloudinary product environment and that the key can create assets.";
+  }
+  return `Cloudinary upload failed: ${rawMessage}`;
+}
+
 function safeFileName(name: string) {
   const ext = path.extname(name).toLowerCase();
   const base = path
@@ -100,10 +136,15 @@ function assertValidUpload(file: File) {
 
 async function uploadLocal(file: File, fileName: string, bytes: Buffer) {
   if (process.env.VERCEL) {
-    throw new Error("Local upload storage is not persistent on Vercel. Configure S3-compatible storage or Cloudinary.");
+    throw new StorageUploadError("Local upload storage is not persistent on Vercel. Configure S3-compatible storage or Cloudinary.", {
+      code: "configuration",
+      status: 503,
+    });
   }
   const uploadRoot = process.env.CMS_LOCAL_UPLOAD_DIR;
-  if (!uploadRoot) throw new Error("CMS_LOCAL_UPLOAD_DIR is required for local upload storage.");
+  if (!uploadRoot) {
+    throw new StorageUploadError("CMS_LOCAL_UPLOAD_DIR is required for local upload storage.", { code: "configuration", status: 503 });
+  }
   const resolvedRoot = path.resolve(uploadRoot);
   const target = path.join(resolvedRoot, fileName);
   if (!target.startsWith(resolvedRoot)) throw new Error("Invalid upload path.");
@@ -123,7 +164,10 @@ async function uploadS3(file: File, fileName: string, bytes: Buffer) {
   const accessKeyId = envValue(process.env.S3_ACCESS_KEY_ID);
   const secretAccessKey = envValue(process.env.S3_SECRET_ACCESS_KEY);
   if (!bucket || !endpoint || !publicBaseUrl || !accessKeyId || !secretAccessKey) {
-    throw new Error("S3-compatible storage is not configured.");
+    throw new StorageUploadError(
+      "S3-compatible storage is not configured. Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY and S3_PUBLIC_BASE_URL.",
+      { code: "configuration", status: 503 },
+    );
   }
 
   const client = new S3Client({
@@ -136,15 +180,26 @@ async function uploadS3(file: File, fileName: string, bytes: Buffer) {
     },
   });
   const key = `cms/${new Date().getUTCFullYear()}/${fileName}`;
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: bytes,
-      ContentType: file.type,
-      CacheControl: "public, max-age=31536000, immutable",
-    }),
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: bytes,
+        ContentType: file.type,
+        CacheControl: "public, max-age=31536000, immutable",
+      }),
+    );
+  } catch (error) {
+    const rawMessage = messageFromError(error);
+    if (looksLikePermissionError(rawMessage)) {
+      throw new StorageUploadError(
+        "S3-compatible storage rejected the upload because the configured credentials cannot create objects. Grant PutObject/create permission for the configured bucket and cms/ prefix.",
+        { code: "permission", cause: error },
+      );
+    }
+    throw new StorageUploadError(`S3-compatible upload failed: ${rawMessage}`, { cause: error });
+  }
   return {
     url: `${publicBaseUrl.replace(/\/$/, "")}/${key}`,
     storageKey: key,
@@ -163,7 +218,7 @@ type CloudinaryUploadPayload = {
 async function uploadCloudinary(file: File, fileName: string) {
   const { cloudName, apiKey, apiSecret, folder } = cloudinaryConfig();
   if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error("Cloudinary storage is not configured.");
+    throw new StorageUploadError("Cloudinary storage is not configured.", { code: "configuration", status: 503 });
   }
 
   const publicId = path.basename(fileName, path.extname(fileName));
@@ -181,10 +236,15 @@ async function uploadCloudinary(file: File, fileName: string) {
     method: "POST",
     body: formData,
   });
-  const payload = (await response.json()) as CloudinaryUploadPayload;
+  const payload = (await response.json().catch(() => ({}))) as CloudinaryUploadPayload;
 
   if (!response.ok || !payload.secure_url) {
-    throw new Error(payload.error?.message || "Cloudinary upload failed.");
+    const rawMessage = payload.error?.message || response.statusText || "Cloudinary upload failed.";
+    const isPermissionError = response.status === 401 || response.status === 403 || looksLikePermissionError(rawMessage);
+    throw new StorageUploadError(cloudinaryUploadErrorMessage(rawMessage, response.status), {
+      code: isPermissionError ? "permission" : "provider",
+      cause: payload.error || rawMessage,
+    });
   }
 
   return {

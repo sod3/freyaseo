@@ -36,6 +36,16 @@ const importantPageAreas = [
   { label: "Greek Contact", path: "/el/lets-contact/" },
 ];
 
+const adminErrorMessages: Record<string, string> = {
+  "storage-configuration": "media storage is not configured for uploads",
+  "storage-permission": "media storage rejected the upload credentials; update the Cloudinary or S3 key so it can create assets",
+  upload: "media upload failed",
+};
+
+function adminStatusMessage(value: string) {
+  return adminErrorMessages[value] || value.replace(/-/g, " ");
+}
+
 export default async function AdminModulePage({
   params,
   searchParams,
@@ -74,8 +84,8 @@ export default async function AdminModulePage({
         <p className="admin-muted">{data.description}</p>
       </div>
 
-      {query.notice ? <div className="admin-alert">Action complete: {query.notice.replace(/-/g, " ")}</div> : null}
-      {query.error ? <div className="admin-alert admin-alert-error">Could not complete action: {query.error.replace(/-/g, " ")}</div> : null}
+      {query.notice ? <div className="admin-alert">Action complete: {adminStatusMessage(query.notice)}</div> : null}
+      {query.error ? <div className="admin-alert admin-alert-error">Could not complete action: {adminStatusMessage(query.error)}</div> : null}
 
       {adminModule.slug === "pages" ? (
         <section className="admin-panel">

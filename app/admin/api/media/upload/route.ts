@@ -2,7 +2,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { can, getCurrentAdminUser, getRequestMeta } from "@/src/lib/admin/auth";
 import { isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
-import { saveUpload } from "@/src/lib/storage";
+import { saveUpload, StorageUploadError } from "@/src/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +75,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed.";
+    const status = error instanceof StorageUploadError ? error.status : 400;
     await auditUpload("media.upload_failed", user.id, null, { message, source: "inline-editor" });
-    return jsonError(message, 400);
+    return jsonError(message, status);
   }
 }

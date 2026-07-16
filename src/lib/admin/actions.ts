@@ -6,7 +6,7 @@ import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import type { Document, Filter } from "mongodb";
 import { documentId, idFilter, isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
-import { saveUpload } from "@/src/lib/storage";
+import { saveUpload, StorageUploadError } from "@/src/lib/storage";
 import {
   can,
   createSession,
@@ -801,6 +801,12 @@ export async function uploadMediaAction(formData: FormData) {
     safeAdminRedirect("/admin/media?notice=uploaded");
   } catch (error) {
     await audit("media.upload_failed", "media", null, null, { message: error instanceof Error ? error.message : "Upload failed" });
-    safeAdminRedirect("/admin/media?error=upload");
+    const uploadError =
+      error instanceof StorageUploadError && error.code === "permission"
+        ? "storage-permission"
+        : error instanceof StorageUploadError && error.code === "configuration"
+          ? "storage-configuration"
+          : "upload";
+    safeAdminRedirect(`/admin/media?error=${uploadError}`);
   }
 }

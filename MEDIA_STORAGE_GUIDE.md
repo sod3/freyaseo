@@ -45,6 +45,10 @@ CLOUDINARY_FOLDER=cms
 
 Cloudinary uploads do not use `S3_ENDPOINT`, `S3_BUCKET`, or `S3_PUBLIC_BASE_URL`.
 
+The configured Cloudinary API key must be able to create/upload assets in the selected product environment. If uploads show an error like `Request forbidden due to missing permissions (actions=["create"])`, update the Cloudinary key/secret in Vercel to credentials with asset create permission, then redeploy.
+
+For S3-compatible storage, the configured access key must be allowed to create objects in the target bucket under the `cms/` prefix, for example `s3:PutObject` on `bucket/cms/*`.
+
 ## Validation
 
 The upload action rejects unsupported file types, oversized files and executable extensions.
