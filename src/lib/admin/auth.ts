@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ObjectId, type Document } from "mongodb";
+import type { Document, ObjectId } from "mongodb";
 import { documentId, idFilter, isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
 
 export const ADMIN_SESSION_COOKIE = "freya_admin_session";
@@ -159,7 +159,7 @@ export const getCurrentAdminUser = cache(async (): Promise<AdminUser | null> => 
   if (!session || session.revokedAt || session.expiresAt <= new Date()) return null;
 
   const users = await mongoCollection<UserDoc>("users");
-  const user = await users.findOne(idFilter(session.userId), {
+  const user = await users.findOne(await idFilter(session.userId), {
     projection: { email: 1, name: 1, status: 1, mustChangePassword: 1, deletedAt: 1, roles: 1 },
   });
   if (!user || user.status === "DISABLED" || user.deletedAt) return null;

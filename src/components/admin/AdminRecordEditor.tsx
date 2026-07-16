@@ -152,7 +152,7 @@ async function getJsonRecord(moduleSlug: AdminModuleSlug, id: string): Promise<E
 
   const collectionName = storage.collectionName;
   if (!collectionName) return null;
-  const record = await (await mongoCollection<Record<string, unknown>>(collectionName)).findOne(idFilter(id));
+  const record = await (await mongoCollection<Record<string, unknown>>(collectionName)).findOne(await idFilter(id));
   if (!record) return null;
   const locale = record.locale === "el" || record.language === "el" ? "el" : "en";
   const jsonData = editableJson(record);
@@ -218,7 +218,7 @@ async function getRecord(moduleSlug: string, id: string): Promise<EditRecord | n
 
   if (moduleSlug === "pages") {
     const pages = await mongoCollection<Record<string, unknown>>("pages");
-    const page = await pages.findOne(idFilter(id));
+    const page = await pages.findOne(await idFilter(id));
     if (!page) return null;
     const locale = pageLocale(page);
     const seo = typeof page.seo === "object" && page.seo ? (page.seo as Record<string, unknown>) : {};
@@ -247,7 +247,7 @@ async function getRecord(moduleSlug: string, id: string): Promise<EditRecord | n
   }
 
   if (moduleSlug === "blog") {
-    const post = await (await mongoCollection<Record<string, unknown>>("blogPosts")).findOne(idFilter(id));
+    const post = await (await mongoCollection<Record<string, unknown>>("blogPosts")).findOne(await idFilter(id));
     if (!post) return null;
     const locale = post.language === "el" || post.locale === "el" ? "el" : "en";
     const seo = typeof post.seo === "object" && post.seo ? (post.seo as Record<string, unknown>) : {};

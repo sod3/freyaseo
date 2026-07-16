@@ -263,7 +263,7 @@ function safeAdminRedirect(path: string): never {
   redirect(path.startsWith("/admin") ? path : "/admin/dashboard");
 }
 
-function byId(id: string): Filter<Document> {
+async function byId(id: string): Promise<Filter<Document>> {
   return idFilter(id);
 }
 
@@ -336,7 +336,7 @@ export async function loginAction(formData: FormData) {
     });
     if (user) {
       const nextFailures = Number(user.failedLoginCount || 0) + 1;
-      await users.updateOne(byId(documentId(user)), {
+      await users.updateOne(await byId(documentId(user)), {
         $set: {
           failedLoginCount: nextFailures,
           lockedUntil: nextFailures >= 8 ? new Date(Date.now() + 15 * 60 * 1000) : lockedUntil,
@@ -350,7 +350,7 @@ export async function loginAction(formData: FormData) {
   }
 
   await loginAttempts.insertOne({ email, ipAddress: meta.ipAddress, success: true, createdAt: new Date() });
-  await users.updateOne(byId(documentId(user)), {
+  await users.updateOne(await byId(documentId(user)), {
     $set: {
       failedLoginCount: 0,
       lockedUntil: null,
@@ -383,12 +383,12 @@ export async function changePasswordAction(formData: FormData) {
   }
 
   const users = await mongoCollection<Record<string, unknown>>("users");
-  const dbUser = await users.findOne(byId(user.id));
+  const dbUser = await users.findOne(await byId(user.id));
   if (!dbUser || !(await verifyPassword(parsed.data.currentPassword, String(dbUser.passwordHash || "")))) {
     safeAdminRedirect("/admin/settings?error=password");
   }
 
-  await users.updateOne(byId(user.id), {
+  await users.updateOne(await byId(user.id), {
     $set: {
       passwordHash: await hashPassword(parsed.data.newPassword),
       mustChangePassword: false,
@@ -402,7 +402,7 @@ export async function changePasswordAction(formData: FormData) {
 
 async function updatePageRecord(data: z.infer<typeof recordSchema>) {
   const pages = await mongoCollection<Record<string, unknown>>("pages");
-  const current = await pages.findOne(byId(data.id || ""));
+  const current = await pages.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Page not found.");
   const nextPath = data.path || String(current.path || "");
   const now = new Date();
@@ -429,7 +429,7 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
   const sections = parseSectionsJson(data.sectionsJson, current.sections);
   const nextHtml = applyVisualContentEdits(data.pageHtml ?? String(current.html || ""), data.contentEditsJson);
 
-  await pages.updateOne(byId(documentId(current)), {
+  await pages.updateOne(await byId(documentId(current)), {
     $set: {
       title: data.title,
       description: data.description || "",
@@ -529,7 +529,7 @@ async function createPageRecord(data: z.infer<typeof recordSchema>) {
 
 async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
   const posts = await mongoCollection<Record<string, unknown>>("blogPosts");
-  const current = await posts.findOne(byId(data.id || ""));
+  const current = await posts.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Blog post not found.");
   const locale = String(current.language || current.locale || data.language || "en");
   const slug = data.slug || String(current.slug || "");
@@ -543,7 +543,7 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
     typeof (typeof current.seo === "object" && current.seo ? (current.seo as Record<string, unknown>).description : null) === "object"
       ? (((current.seo as Record<string, unknown>).description as Record<string, unknown>) || {})
       : {};
-  await posts.updateOne(byId(documentId(current)), {
+  await posts.updateOne(await byId(documentId(current)), {
     $set: {
       title: data.title,
       excerpt: data.description || "",
@@ -707,7 +707,7 @@ export async function saveJsonRecordAction(formData: FormData) {
   } else if (storage.collectionName) {
     const collection = await mongoCollection(storage.collectionName);
     if (parsed.data.id && parsed.data.id !== "new") {
-      await collection.updateOne(byId(parsed.data.id), { $set: { ...record, updatedAt: now } });
+      await collection.updateOne(await byId(parsed.data.id), { $set: { ...record, updatedAt: now } });
     } else {
       await collection.insertOne({ ...defaultJsonForModule(moduleSlug), ...record, createdAt: now, updatedAt: now });
     }
@@ -733,7 +733,7 @@ export async function softDeleteRecordAction(formData: FormData) {
   const now = new Date();
   const collectionName = moduleSlug === "pages" ? "pages" : moduleSlug === "blog" ? "blogPosts" : collectionModuleNames[moduleSlug as AdminModuleSlug];
   if (!collectionName) safeAdminRedirect(`/admin/${moduleSlug}?error=unsupported`);
-  await (await mongoCollection(collectionName)).updateOne(byId(id), {
+  await (await mongoCollection(collectionName)).updateOne(await byId(id), {
     $set: moduleSlug === "redirects" ? { active: false, updatedAt: now } : { deletedAt: now, status: "soft_deleted", updatedAt: now },
   });
   await audit("content.deleted", moduleSlug, id);
@@ -749,7 +749,7 @@ export async function restoreRecordAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   const collectionName = moduleSlug === "pages" ? "pages" : moduleSlug === "blog" ? "blogPosts" : collectionModuleNames[moduleSlug as AdminModuleSlug];
   if (!collectionName) safeAdminRedirect(`/admin/${moduleSlug}?error=unsupported`);
-  await (await mongoCollection(collectionName)).updateOne(byId(id), {
+  await (await mongoCollection(collectionName)).updateOne(await byId(id), {
     $set: moduleSlug === "redirects" ? { active: true, updatedAt: new Date() } : { deletedAt: null, status: "draft", updatedAt: new Date() },
   });
   await audit("content.restored", moduleSlug, id);
