@@ -258,6 +258,148 @@ function prepareFormValidation(form: HTMLFormElement, locale: Locale) {
   return () => form.removeEventListener("submit", onSubmit);
 }
 
+type CounterSettings = {
+  from: number;
+  to: number;
+  decimals: number;
+  delimiter: string;
+  duration: number;
+};
+
+const counterSelector = ".elementor-counter-number, .counter[data-target]";
+
+function readCounterNumber(value: string | null | undefined) {
+  const match = value?.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function decimalPlaces(value: string | null | undefined) {
+  const match = value?.match(/\.(\d+)/);
+  return match ? match[1].length : 0;
+}
+
+function getCounterSettings(counter: HTMLElement): CounterSettings | null {
+  const targetText = counter.dataset.toValue || counter.dataset.target || counter.textContent || "";
+  const target = readCounterNumber(targetText);
+  if (target === null) return null;
+
+  const fromText = counter.dataset.fromValue || "0";
+  const from = readCounterNumber(fromText) ?? 0;
+  const durationValue = Number(counter.dataset.duration);
+
+  return {
+    from,
+    to: target,
+    decimals: Math.max(decimalPlaces(targetText), decimalPlaces(fromText)),
+    delimiter: counter.dataset.delimiter || "",
+    duration: Number.isFinite(durationValue) && durationValue > 0 ? Math.min(Math.max(durationValue, 700), 2600) : 1600,
+  };
+}
+
+function formatCounterValue(value: number, settings: CounterSettings) {
+  const sign = value < 0 ? "-" : "";
+  const fixed = Math.abs(value).toFixed(settings.decimals);
+  const [whole, decimal] = fixed.split(".");
+  const formattedWhole = settings.delimiter ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, settings.delimiter) : whole;
+  return `${sign}${formattedWhole}${decimal ? `.${decimal}` : ""}`;
+}
+
+function animateCounter(counter: HTMLElement) {
+  const settings = getCounterSettings(counter);
+  if (!settings || counter.dataset.counterAnimated === "true") return undefined;
+
+  counter.dataset.counterAnimated = "true";
+
+  const setValue = (value: number) => {
+    counter.textContent = formatCounterValue(value, settings);
+  };
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setValue(settings.to);
+    return undefined;
+  }
+
+  let frame = 0;
+  let completed = false;
+  const startedAt = performance.now();
+
+  const tick = (now: number) => {
+    const progress = Math.min((now - startedAt) / settings.duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    setValue(settings.from + (settings.to - settings.from) * eased);
+
+    if (progress < 1) {
+      frame = window.requestAnimationFrame(tick);
+    } else {
+      completed = true;
+      setValue(settings.to);
+    }
+  };
+
+  setValue(settings.from);
+  frame = window.requestAnimationFrame(tick);
+
+  return () => {
+    if (frame) window.cancelAnimationFrame(frame);
+    if (!completed) delete counter.dataset.counterAnimated;
+  };
+}
+
+function prepareCounterAnimations(root: HTMLElement) {
+  const counters = Array.from(root.querySelectorAll<HTMLElement>(counterSelector));
+  const animationCleanups: Array<() => void> = [];
+
+  counters.forEach((counter) => {
+    if (counter.dataset.counterAnimated === "true") return;
+    const settings = getCounterSettings(counter);
+    if (!settings) return;
+    counter.textContent = formatCounterValue(settings.from, settings);
+  });
+
+  const startCounter = (counter: HTMLElement) => {
+    const cleanup = animateCounter(counter);
+    if (cleanup) animationCleanups.push(cleanup);
+  };
+
+  const startCountersIn = (target: Element) => {
+    const visibleCounters = target.matches(counterSelector)
+      ? [target as HTMLElement]
+      : Array.from(target.querySelectorAll<HTMLElement>(counterSelector));
+    visibleCounters.forEach(startCounter);
+  };
+
+  if (!("IntersectionObserver" in window)) {
+    counters.forEach(startCounter);
+    return () => animationCleanups.forEach((cleanup) => cleanup());
+  }
+
+  const observedTargets = new Set<Element>();
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        startCountersIn(entry.target);
+        observer.unobserve(entry.target);
+      });
+    },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0.35 },
+  );
+
+  counters.forEach((counter) => {
+    const target = counter.closest(".elementor-widget-counter, .stat-card") || counter;
+    if (observedTargets.has(target)) return;
+    observedTargets.add(target);
+    observer.observe(target);
+  });
+
+  return () => {
+    observer.disconnect();
+    animationCleanups.forEach((cleanup) => cleanup());
+  };
+}
+
 function applyVisualRepairs(root: HTMLElement) {
   root.dataset.wpCloneEnhanced = "true";
 
@@ -318,6 +460,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath
 
     roots.forEach((root) => {
       applyVisualRepairs(root);
+      cleanups.push(prepareCounterAnimations(root));
       ensureServiceMenu(root, locale);
 
       root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
