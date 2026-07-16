@@ -73,7 +73,7 @@ INITIAL_ADMIN_PASSWORD=
 NEXT_PUBLIC_SITE_URL=
 ```
 
-Uploads must use persistent storage. On Vercel or other ephemeral runtimes, configure the S3-compatible variables in `.env.example`.
+Uploads must use persistent storage. On Vercel or other ephemeral runtimes, configure the S3-compatible or Cloudinary variables in `.env.example`.
 
 ## Migration Source
 

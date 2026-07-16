@@ -4,7 +4,7 @@
 
 Uploads must be stored on persistent infrastructure.
 
-- Use S3-compatible storage on Vercel.
+- Use S3-compatible storage or Cloudinary on Vercel.
 - Use local storage only on a VPS or server with a persistent disk.
 
 ## S3-Compatible Configuration
@@ -22,6 +22,28 @@ S3_PUBLIC_BASE_URL=
 ```
 
 The storage adapter uploads files under a `cms/` prefix and stores searchable metadata in MongoDB.
+
+## Cloudinary Configuration
+
+Set:
+
+```env
+CMS_STORAGE_DRIVER=cloudinary
+CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+CLOUDINARY_FOLDER=cms
+```
+
+Alternatively, set the Cloudinary values separately:
+
+```env
+CMS_STORAGE_DRIVER=cloudinary
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_FOLDER=cms
+```
+
+Cloudinary uploads do not use `S3_ENDPOINT`, `S3_BUCKET`, or `S3_PUBLIC_BASE_URL`.
 
 ## Validation
 

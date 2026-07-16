@@ -10,7 +10,7 @@ The CMS runs inside the same Next.js application as the public Freya SEO website
 - Authentication uses email/password, bcrypt hashes, HTTP-only cookies, session records and CSRF tokens.
 - MongoDB indexes are prepared by `scripts/ensure-mongodb-indexes.mjs`.
 - Seed import lives at `scripts/seed-custom-cms.mjs`.
-- Uploads use `src/lib/storage/` and require persistent local storage or S3-compatible storage.
+- Uploads use `src/lib/storage/` and require persistent local storage, S3-compatible storage, or Cloudinary.
 
 ## Setup
 

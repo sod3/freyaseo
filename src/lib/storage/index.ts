@@ -21,6 +21,48 @@ function storageDriver() {
   return (process.env.CMS_STORAGE_DRIVER || "s3").toLowerCase();
 }
 
+function decodeCloudinaryUrlPart(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function cloudinaryConfig() {
+  const parsed = process.env.CLOUDINARY_URL
+    ? (() => {
+        try {
+          const url = new URL(process.env.CLOUDINARY_URL || "");
+          if (url.protocol !== "cloudinary:") return {};
+          return {
+            cloudName: url.hostname,
+            apiKey: decodeCloudinaryUrlPart(url.username),
+            apiSecret: decodeCloudinaryUrlPart(url.password),
+          };
+        } catch {
+          return {};
+        }
+      })()
+    : {};
+
+  return {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || parsed.cloudName,
+    apiKey: process.env.CLOUDINARY_API_KEY || parsed.apiKey,
+    apiSecret: process.env.CLOUDINARY_API_SECRET || parsed.apiSecret,
+    folder: process.env.CLOUDINARY_FOLDER || "cms",
+  };
+}
+
+function cloudinarySignature(params: Record<string, string | number>, apiSecret: string) {
+  const signatureBase = Object.entries(params)
+    .filter(([, value]) => value !== "")
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+  return crypto.createHash("sha1").update(`${signatureBase}${apiSecret}`).digest("hex");
+}
+
 function safeFileName(name: string) {
   const ext = path.extname(name).toLowerCase();
   const base = path
@@ -48,7 +90,7 @@ function assertValidUpload(file: File) {
 
 async function uploadLocal(file: File, fileName: string, bytes: Buffer) {
   if (process.env.VERCEL) {
-    throw new Error("Local upload storage is not persistent on Vercel. Configure S3-compatible storage.");
+    throw new Error("Local upload storage is not persistent on Vercel. Configure S3-compatible storage or Cloudinary.");
   }
   const uploadRoot = process.env.CMS_LOCAL_UPLOAD_DIR;
   if (!uploadRoot) throw new Error("CMS_LOCAL_UPLOAD_DIR is required for local upload storage.");
@@ -100,12 +142,59 @@ async function uploadS3(file: File, fileName: string, bytes: Buffer) {
   };
 }
 
+type CloudinaryUploadPayload = {
+  secure_url?: string;
+  public_id?: string;
+  error?: {
+    message?: string;
+  };
+};
+
+async function uploadCloudinary(file: File, fileName: string) {
+  const { cloudName, apiKey, apiSecret, folder } = cloudinaryConfig();
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("Cloudinary storage is not configured.");
+  }
+
+  const publicId = path.basename(fileName, path.extname(fileName));
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signedParams = { folder, public_id: publicId, timestamp };
+  const formData = new FormData();
+  formData.set("file", file, fileName);
+  formData.set("api_key", apiKey);
+  formData.set("folder", folder);
+  formData.set("public_id", publicId);
+  formData.set("timestamp", String(timestamp));
+  formData.set("signature", cloudinarySignature(signedParams, apiSecret));
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/auto/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  const payload = (await response.json()) as CloudinaryUploadPayload;
+
+  if (!response.ok || !payload.secure_url) {
+    throw new Error(payload.error?.message || "Cloudinary upload failed.");
+  }
+
+  return {
+    url: payload.secure_url,
+    storageKey: payload.public_id || `${folder}/${publicId}`,
+    storageDriver: "CLOUDINARY" as const,
+  };
+}
+
 export async function saveUpload(file: File) {
   assertValidUpload(file);
   const fileName = safeFileName(file.name);
   const bytes = Buffer.from(await file.arrayBuffer());
   const driver = storageDriver();
-  const stored = driver === "local" ? await uploadLocal(file, fileName, bytes) : await uploadS3(file, fileName, bytes);
+  const stored =
+    driver === "local"
+      ? await uploadLocal(file, fileName, bytes)
+      : driver === "cloudinary"
+        ? await uploadCloudinary(file, fileName)
+        : await uploadS3(file, fileName, bytes);
 
   return {
     ...stored,

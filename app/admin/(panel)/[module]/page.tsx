@@ -129,7 +129,7 @@ export default async function AdminModulePage({
         <form className="admin-form-panel" action={uploadMediaAction}>
           <input type="hidden" name="csrfToken" value={csrfToken} />
           <h2>Upload media</h2>
-          <p className="admin-muted">Uploads must use persistent storage. On Vercel, configure S3-compatible storage before using this.</p>
+          <p className="admin-muted">Uploads must use persistent storage. On Vercel, configure S3-compatible storage or Cloudinary before using this.</p>
           <label className="admin-field">
             <span>File</span>
             <input className="admin-input" type="file" name="file" accept="image/*,.pdf,.doc,.docx,.txt" required />

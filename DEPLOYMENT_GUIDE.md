@@ -27,14 +27,19 @@ S3_BUCKET=
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 S3_PUBLIC_BASE_URL=
+CLOUDINARY_URL=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_FOLDER=
 ```
 
-Use `CMS_STORAGE_DRIVER=s3` on Vercel.
+Use `CMS_STORAGE_DRIVER=s3` or `CMS_STORAGE_DRIVER=cloudinary` on Vercel.
 
 ## Deploy Steps
 
 1. Provision MongoDB Atlas or another persistent MongoDB provider.
-2. Provision S3-compatible object storage.
+2. Provision persistent object storage, such as S3-compatible storage or Cloudinary.
 3. Set environment variables in the hosting platform.
 4. Run `npm run db:migrate`.
 5. Run `npm run db:seed` once.
