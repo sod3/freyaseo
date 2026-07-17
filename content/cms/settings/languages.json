@@ -1,0 +1,27 @@
+{
+  "defaultLanguage": "en",
+  "languages": [
+    {
+      "code": "en",
+      "name": "English",
+      "nativeName": "English",
+      "shortLabel": "EN",
+      "flagEmoji": "",
+      "pathPrefix": "",
+      "textDirection": "ltr",
+      "active": true,
+      "isDefault": true
+    },
+    {
+      "code": "el",
+      "name": "Greek",
+      "nativeName": "Greek",
+      "shortLabel": "EL",
+      "flagEmoji": "",
+      "pathPrefix": "/el",
+      "textDirection": "ltr",
+      "active": true,
+      "isDefault": false
+    }
+  ]
+}

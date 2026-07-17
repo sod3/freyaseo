@@ -12,7 +12,11 @@ export function metadataForWpClonePage(page: WpClonePageData): Metadata {
   };
 }
 
-export function WpClonePage({ page }: { page: WpClonePageData }) {
+type RuntimeWpClonePage = Omit<WpClonePageData, "locale"> & {
+  locale: string;
+};
+
+export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
   return (
     <div className={`wp-clone-root ${page.bodyClass}`} data-locale={page.locale} data-page-path={page.path} suppressHydrationWarning>
       <div dangerouslySetInnerHTML={{ __html: page.html }} />

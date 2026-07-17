@@ -6,6 +6,7 @@ import { can, createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { creatableCmsModules, editableCmsModules } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
 import { getModuleRecords } from "@/src/lib/admin/queries";
+import { activeLanguages, getLanguageSettings, languageLabel as cmsLanguageLabel } from "@/src/lib/cms/languages";
 import { AdminRecordEditor } from "@/src/components/admin/AdminRecordEditor";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,8 @@ export default async function AdminModulePage({
 
   const user = await requireAdminUser(adminModule.permission);
   const csrfToken = await createCsrfToken();
+  const languageSettings = await getLanguageSettings();
+  const languages = activeLanguages(languageSettings);
   const data = await getModuleRecords(adminModule.slug, query);
   const canWrite = can(user, "content.write");
   const pageRecordByPath = new Map(data.records.map((record) => [record.href, record]));
@@ -149,12 +152,17 @@ export default async function AdminModulePage({
             <input className="admin-input" name="title" placeholder="Homepage hero image" />
           </label>
           <label className="admin-field">
-            <span>English alt text</span>
-            <input className="admin-input" name="altEn" />
-          </label>
-          <label className="admin-field">
-            <span>Greek alt text</span>
-            <input className="admin-input" name="altEl" />
+            <span>Alt text</span>
+            <div className="admin-json-list">
+              {languages.map((language) => (
+                <input
+                  className="admin-input"
+                  name={`alt_${language.code}`}
+                  placeholder={`${cmsLanguageLabel(language)} alt text`}
+                  key={language.code}
+                />
+              ))}
+            </div>
           </label>
           <label className="admin-checkbox">
             <input type="checkbox" name="decorative" />
@@ -176,8 +184,11 @@ export default async function AdminModulePage({
           <span>Language</span>
           <select className="admin-select" name="language" defaultValue={query.language || "all"}>
             <option value="all">All</option>
-            <option value="en">English</option>
-            <option value="el">Greek</option>
+            {languages.map((language) => (
+              <option value={language.code} key={language.code}>
+                {cmsLanguageLabel(language)}
+              </option>
+            ))}
           </select>
         </label>
         <label className="admin-field">

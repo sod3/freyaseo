@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
+import { isValidLanguageCode, normalizeLanguageCode } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ const submissionSchema = z.object({
   subject: z.string().max(180).optional().default("Website contact"),
   message: z.string().max(2000).optional().default(""),
   sourcePage: z.string().max(300).optional().default("/"),
-  language: z.enum(["en", "el"]).optional().default("en"),
+  language: z.string().trim().transform(normalizeLanguageCode).refine(isValidLanguageCode).optional().default("en"),
 });
 
 function clean(value: string) {

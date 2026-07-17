@@ -8,8 +8,10 @@ import { createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { defaultJsonForModule, editableCmsModules, getModuleStorage, writePermissionForModule } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
 import { documentId, idFilter, mongoCollection } from "@/src/lib/mongo";
+import { activeLanguages, getLanguageSettings, languageLabel as cmsLanguageLabel, languagePathPrefix, type CmsLanguage } from "@/src/lib/cms/languages";
 import { ImageUrlField } from "./ImageUrlField";
 import { JsonFieldEditor } from "./JsonFieldEditor";
+import { LanguageManagerEditor } from "./LanguageManagerEditor";
 import { PageContentEditor } from "./PageContentEditor";
 import { RichTextEditor } from "./RichTextEditor";
 
@@ -20,7 +22,7 @@ type EditRecord = {
   title: string;
   description: string;
   status: string;
-  language: "en" | "el";
+  language: string;
   path: string;
   slug: string;
   category: string;
@@ -37,7 +39,7 @@ type EditRecord = {
 };
 
 type LanguageVersion = {
-  locale: "en" | "el";
+  locale: string;
   label: string;
   id?: string;
   title: string;
@@ -45,23 +47,28 @@ type LanguageVersion = {
   current: boolean;
 };
 
-function localized(value: unknown, locale: "en" | "el") {
+function localized(value: unknown, locale: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const copy = value as Partial<Record<"en" | "el", string>>;
-  return copy[locale] || copy.en || copy.el || "";
+  const copy = value as Record<string, unknown>;
+  const direct = copy[locale];
+  if (typeof direct === "string") return direct;
+  if (typeof copy.en === "string") return copy.en;
+  if (typeof copy.el === "string") return copy.el;
+  const fallback = Object.values(copy).find((item) => typeof item === "string" && item.trim());
+  return typeof fallback === "string" ? fallback : "";
 }
 
-function displayTitle(value: unknown, locale: "en" | "el" = "en") {
+function displayTitle(value: unknown, locale = "en") {
   if (typeof value === "string") return value;
   return localized(value, locale);
 }
 
-function pageLocale(document: Record<string, unknown>): "en" | "el" {
-  return document.locale === "el" || String(document.path || "").startsWith("/el/") ? "el" : "en";
-}
-
-function languageLabel(locale: "en" | "el") {
-  return locale === "el" ? "Greek" : "English";
+function pageLocale(document: Record<string, unknown>, languages: CmsLanguage[], defaultLanguage: string) {
+  const explicitLocale = String(document.locale || document.language || "").trim().toLowerCase();
+  if (explicitLocale) return explicitLocale;
+  const path = normalizePath(String(document.path || "/"));
+  const match = languages.find((language) => language.pathPrefix && path.startsWith(`${language.pathPrefix}/`));
+  return match?.code || defaultLanguage;
 }
 
 function exactAlternatePath(pathname: string) {
@@ -129,7 +136,7 @@ function emptyRecord(overrides: Partial<EditRecord> = {}): EditRecord {
   };
 }
 
-async function getJsonRecord(moduleSlug: AdminModuleSlug, id: string): Promise<EditRecord | null> {
+async function getJsonRecord(moduleSlug: AdminModuleSlug, id: string, languages: CmsLanguage[], defaultLanguage: string): Promise<EditRecord | null> {
   const storage = getModuleStorage(moduleSlug);
   if (!storage.collectionName && !storage.settingKey) return null;
 
@@ -154,7 +161,7 @@ async function getJsonRecord(moduleSlug: AdminModuleSlug, id: string): Promise<E
   if (!collectionName) return null;
   const record = await (await mongoCollection<Record<string, unknown>>(collectionName)).findOne(await idFilter(id));
   if (!record) return null;
-  const locale = record.locale === "el" || record.language === "el" ? "el" : "en";
+  const locale = pageLocale(record, languages, defaultLanguage);
   const jsonData = editableJson(record);
   return emptyRecord({
     id: documentId(record),
@@ -167,18 +174,25 @@ async function getJsonRecord(moduleSlug: AdminModuleSlug, id: string): Promise<E
   });
 }
 
-async function getPageLanguageVersions(page: Record<string, unknown>, pages: Collection<Record<string, unknown>>): Promise<LanguageVersion[]> {
-  const currentLocale = pageLocale(page);
+async function getPageLanguageVersions(
+  page: Record<string, unknown>,
+  pages: Collection<Record<string, unknown>>,
+  languages: CmsLanguage[],
+  defaultLanguage: string,
+): Promise<LanguageVersion[]> {
+  const currentLocale = pageLocale(page, languages, defaultLanguage);
   const currentPath = normalizePath(String(page.path || "/"));
   const alternatePath = String(page.alternatePath || exactAlternatePath(currentPath) || "");
   const normalizedAlternatePath = alternatePath ? normalizePath(alternatePath) : "";
-  const versions = new Map<"en" | "el", LanguageVersion>();
+  const translationKey = String(page.translationKey || page.translationGroup || "").trim();
+  const versions = new Map<string, LanguageVersion>();
 
   const addDocument = (document: Record<string, unknown>, current: boolean) => {
-    const locale = pageLocale(document);
+    const locale = pageLocale(document, languages, defaultLanguage);
+    const language = languages.find((item) => item.code === locale);
     versions.set(locale, {
       locale,
-      label: languageLabel(locale),
+      label: language ? cmsLanguageLabel(language) : locale.toUpperCase(),
       id: documentId(document),
       title: displayTitle(document.title, locale) || String(document.path || ""),
       path: normalizePath(String(document.path || "")),
@@ -187,6 +201,19 @@ async function getPageLanguageVersions(page: Record<string, unknown>, pages: Col
   };
 
   addDocument(page, true);
+
+  if (translationKey) {
+    const linkedPages = await pages
+      .find(
+        { translationKey, deletedAt: { $ne: true } },
+        { projection: { _id: 1, title: 1, path: 1, locale: 1, translationKey: 1, deletedAt: 1 } },
+      )
+      .toArray();
+
+    for (const linkedPage of linkedPages) {
+      addDocument(linkedPage, documentId(linkedPage) === documentId(page));
+    }
+  }
 
   if (normalizedAlternatePath) {
     const alternate = await pages.findOne(
@@ -197,10 +224,11 @@ async function getPageLanguageVersions(page: Record<string, unknown>, pages: Col
     if (alternate && !alternate.deletedAt) {
       addDocument(alternate, false);
     } else {
-      const missingLocale = currentLocale === "en" ? "el" : "en";
+      const missingLocale = languages.find((language) => language.code !== currentLocale)?.code || defaultLanguage;
+      const language = languages.find((item) => item.code === missingLocale);
       versions.set(missingLocale, {
         locale: missingLocale,
-        label: languageLabel(missingLocale),
+        label: language ? cmsLanguageLabel(language) : missingLocale.toUpperCase(),
         title: "Translation not created yet",
         path: normalizedAlternatePath,
         current: false,
@@ -208,24 +236,38 @@ async function getPageLanguageVersions(page: Record<string, unknown>, pages: Col
     }
   }
 
-  return (["en", "el"] as const).map((locale) => versions.get(locale)).filter(Boolean) as LanguageVersion[];
+  return languages.map((language) => {
+    const existing = versions.get(language.code);
+    if (existing) return existing;
+
+    const currentSlug = String(page.slug || page.sourceSlug || "page");
+    const prefix = languagePathPrefix(language.code, defaultLanguage, language.pathPrefix);
+    const missingPath = prefix ? `${prefix}/${currentSlug}/`.replace(/\/{2,}/g, "/") : `/${currentSlug}/`;
+    return {
+      locale: language.code,
+      label: cmsLanguageLabel(language),
+      title: "Translation not created yet",
+      path: missingPath,
+      current: false,
+    };
+  });
 }
 
-async function getRecord(moduleSlug: string, id: string): Promise<EditRecord | null> {
+async function getRecord(moduleSlug: string, id: string, languages: CmsLanguage[], defaultLanguage: string): Promise<EditRecord | null> {
   if (id === "new") {
-    return emptyRecord({ title: "" });
+    return emptyRecord({ title: "", language: defaultLanguage });
   }
 
   if (moduleSlug === "pages") {
     const pages = await mongoCollection<Record<string, unknown>>("pages");
     const page = await pages.findOne(await idFilter(id));
     if (!page) return null;
-    const locale = pageLocale(page);
+    const locale = pageLocale(page, languages, defaultLanguage);
     const seo = typeof page.seo === "object" && page.seo ? (page.seo as Record<string, unknown>) : {};
     const tags = Array.isArray(page.tags) ? page.tags.map(String).join(", ") : "";
     return {
       id: documentId(page),
-      languageVersions: await getPageLanguageVersions(page, pages),
+      languageVersions: await getPageLanguageVersions(page, pages, languages, defaultLanguage),
       title: String(page.title || ""),
       description: String(page.description || ""),
       status: String(page.status || "draft"),
@@ -249,7 +291,7 @@ async function getRecord(moduleSlug: string, id: string): Promise<EditRecord | n
   if (moduleSlug === "blog") {
     const post = await (await mongoCollection<Record<string, unknown>>("blogPosts")).findOne(await idFilter(id));
     if (!post) return null;
-    const locale = post.language === "el" || post.locale === "el" ? "el" : "en";
+    const locale = pageLocale(post, languages, defaultLanguage);
     const seo = typeof post.seo === "object" && post.seo ? (post.seo as Record<string, unknown>) : {};
     const slug = String(post.slug || "");
     const tags = Array.isArray(post.tags) ? post.tags.map(String).join(", ") : "";
@@ -314,10 +356,12 @@ export async function AdminRecordEditor({ moduleSlug, id }: { moduleSlug: string
 
   await requireAdminUser(adminModule.slug === "pages" || adminModule.slug === "blog" ? "content.write" : writePermissionForModule(adminModule.slug));
   const csrfToken = await createCsrfToken();
+  const languageSettings = await getLanguageSettings();
+  const languages = activeLanguages(languageSettings);
   const record =
     adminModule.slug === "pages" || adminModule.slug === "blog"
-      ? await getRecord(adminModule.slug, id)
-      : await getJsonRecord(adminModule.slug, id);
+      ? await getRecord(adminModule.slug, id, languages, languageSettings.defaultLanguage)
+      : await getJsonRecord(adminModule.slug, id, languages, languageSettings.defaultLanguage);
   if (!record) notFound();
 
   const isNew = id === "new";
@@ -338,7 +382,7 @@ export async function AdminRecordEditor({ moduleSlug, id }: { moduleSlug: string
           <input type="hidden" name="csrfToken" value={csrfToken} />
           <input type="hidden" name="module" value={adminModule.slug} />
           {record.id ? <input type="hidden" name="id" value={record.id} /> : null}
-          <JsonFieldEditor jsonData={record.jsonData} />
+          {adminModule.slug === "languages" ? <LanguageManagerEditor jsonData={record.jsonData} /> : <JsonFieldEditor jsonData={record.jsonData} />}
           <div className="admin-actions">
             <button className="admin-button admin-button-primary" type="submit">
               <Save size={17} aria-hidden />
@@ -372,8 +416,11 @@ export async function AdminRecordEditor({ moduleSlug, id }: { moduleSlug: string
               <label className="admin-field">
                 <span>Language</span>
                 <select className="admin-select" name="language" defaultValue={record.language}>
-                  <option value="en">English</option>
-                  <option value="el">Greek</option>
+                  {languages.map((language) => (
+                    <option value={language.code} key={language.code}>
+                      {cmsLanguageLabel(language)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="admin-field">

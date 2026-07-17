@@ -3,11 +3,21 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAlternatePath, normalizePath, serviceRoutes } from "@/src/content/route-map";
-import type { Locale } from "@/src/types";
 
 type ServiceMenuItem = {
   label: string;
   href: string;
+};
+
+type BuiltInLocale = "en" | "el";
+
+type LanguageOption = {
+  code: string;
+  label: string;
+  shortLabel: string;
+  flagEmoji?: string;
+  href: string;
+  current: boolean;
 };
 
 const legacyRouteFixes: Record<string, string> = {
@@ -15,7 +25,7 @@ const legacyRouteFixes: Record<string, string> = {
   "/content-marketing/": "/category/content-marketing/",
 };
 
-const serviceLabels: Record<Locale, Record<(typeof serviceRoutes)[number]["key"], string>> = {
+const serviceLabels: Record<BuiltInLocale, Record<(typeof serviceRoutes)[number]["key"], string>> = {
   en: {
     aiSeo: "AI SEO",
     automation: "Automation",
@@ -51,16 +61,22 @@ const formCopy = {
     success: "Ευχαριστούμε. Το μήνυμά σας είναι έτοιμο για αποστολή.",
     sending: "Αποστολή...",
   },
-} satisfies Record<Locale, Record<string, string>>;
+} satisfies Record<BuiltInLocale, Record<string, string>>;
 
-function localizedServiceMenu(locale: Locale): ServiceMenuItem[] {
+function builtInLocale(locale: string): BuiltInLocale {
+  return locale === "el" ? "el" : "en";
+}
+
+function localizedServiceMenu(locale: string): ServiceMenuItem[] {
+  const contentLocale = builtInLocale(locale);
   return serviceRoutes.map((service) => ({
-    label: serviceLabels[locale][service.key],
-    href: service[locale],
+    label: serviceLabels[contentLocale][service.key],
+    href: service[contentLocale],
   }));
 }
 
-function normalizeHref(href: string | null, locale: Locale) {
+function normalizeHref(href: string | null, locale: string) {
+  const contentLocale = builtInLocale(locale);
   if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return href;
 
   try {
@@ -71,7 +87,7 @@ function normalizeHref(href: string | null, locale: Locale) {
     if (routeFix) return `${routeFix}${url.search}${url.hash}`;
 
     const service = serviceRoutes.find((item) => item.en === normalized || item.el === normalized);
-    if (service) return `${service[locale]}${url.search}${url.hash}`;
+    if (service) return `${service[contentLocale]}${url.search}${url.hash}`;
 
     return `${normalized}${url.search}${url.hash}`;
   } catch {
@@ -79,7 +95,7 @@ function normalizeHref(href: string | null, locale: Locale) {
   }
 }
 
-function ensureServiceMenu(root: HTMLElement, locale: Locale) {
+function ensureServiceMenu(root: HTMLElement, locale: string) {
   const servicesHref = locale === "el" ? "/el/seo-marketing-2/" : "/seo-marketing/";
   const serviceLink = Array.from(root.querySelectorAll<HTMLAnchorElement>(".elementskit-navbar-nav a[href]")).find(
     (link) => normalizePath(link.getAttribute("href") || "") === servicesHref,
@@ -107,6 +123,76 @@ function ensureServiceMenu(root: HTMLElement, locale: Locale) {
     .join("");
 }
 
+function languageOptionLabel(option: LanguageOption) {
+  const flag = option.flagEmoji ? `${option.flagEmoji} ` : "";
+  return `${flag}${option.shortLabel || option.label || option.code.toUpperCase()}`;
+}
+
+function ensureLanguageMenu(root: HTMLElement, languages: LanguageOption[]) {
+  if (languages.length < 2) return () => {};
+
+  const navLists = Array.from(root.querySelectorAll<HTMLUListElement>(".elementskit-navbar-nav"));
+  const cleanups: Array<() => void> = [];
+
+  navLists.forEach((navList) => {
+    navList.querySelectorAll(".lang-item").forEach((item) => item.remove());
+    const current = languages.find((language) => language.current) || languages[0];
+    const item = document.createElement("li");
+    item.className = "menu-item menu-item-has-children elementskit-dropdown-has lang-item freya-language-menu";
+
+    const toggle = document.createElement("a");
+    toggle.className = "ekit-menu-dropdown-toggle freya-language-toggle";
+    toggle.href = current.href || "/";
+    toggle.setAttribute("aria-haspopup", "true");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = languageOptionLabel(current);
+
+    const submenu = document.createElement("ul");
+    submenu.className = "elementskit-dropdown elementskit-submenu-panel freya-language-dropdown";
+
+    languages.forEach((language) => {
+      const languageItem = document.createElement("li");
+      languageItem.className = "menu-item nav-item";
+      const link = document.createElement("a");
+      link.className = "dropdown-item freya-language-option";
+      link.href = language.href;
+      link.hreflang = language.code;
+      link.lang = language.code;
+      link.textContent = language.flagEmoji ? `${language.flagEmoji} ${language.label}` : language.label;
+      if (language.current) {
+        link.setAttribute("aria-current", "page");
+        link.classList.add("active");
+      }
+      languageItem.appendChild(link);
+      submenu.appendChild(languageItem);
+    });
+
+    item.appendChild(toggle);
+    item.appendChild(submenu);
+    navList.appendChild(item);
+
+    const onToggle = (event: MouseEvent) => {
+      event.preventDefault();
+      const isOpen = submenu.classList.toggle("elementskit-dropdown-open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    };
+    const onLinkClick = () => {
+      submenu.classList.remove("elementskit-dropdown-open");
+      toggle.setAttribute("aria-expanded", "false");
+    };
+
+    toggle.addEventListener("click", onToggle);
+    submenu.querySelectorAll("a").forEach((link) => link.addEventListener("click", onLinkClick));
+    cleanups.push(() => {
+      toggle.removeEventListener("click", onToggle);
+      submenu.querySelectorAll("a").forEach((link) => link.removeEventListener("click", onLinkClick));
+      item.remove();
+    });
+  });
+
+  return () => cleanups.forEach((cleanup) => cleanup());
+}
+
 function setActiveLinks(root: HTMLElement, pagePath: string) {
   const current = normalizePath(pagePath);
   root.querySelectorAll(".current-menu-item, .current_page_item, .active").forEach((item) => {
@@ -131,8 +217,8 @@ function setActiveLinks(root: HTMLElement, pagePath: string) {
   });
 }
 
-function localizeCloneForm(form: HTMLFormElement, locale: Locale) {
-  const copy = formCopy[locale];
+function localizeCloneForm(form: HTMLFormElement, locale: string) {
+  const copy = formCopy[builtInLocale(locale)];
   const labels = [
     { selector: "input[name='name-1']", label: copy.name, required: true },
     { selector: "input[name='email-1']", label: copy.email, required: true },
@@ -160,8 +246,8 @@ function localizeCloneForm(form: HTMLFormElement, locale: Locale) {
   }
 }
 
-function prepareFormValidation(form: HTMLFormElement, locale: Locale) {
-  const copy = formCopy[locale];
+function prepareFormValidation(form: HTMLFormElement, locale: string) {
+  const copy = formCopy[builtInLocale(locale)];
   const submit = form.querySelector<HTMLButtonElement>("button[type='submit'], .forminator-button-submit");
 
   const setMessage = (message: string, isError = false) => {
@@ -447,7 +533,16 @@ function applyVisualRepairs(root: HTMLElement) {
   });
 }
 
-export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath: string }) {
+async function loadLanguageOptions(pagePath: string) {
+  const response = await fetch(`/api/languages?path=${encodeURIComponent(pagePath)}`, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as { languages?: LanguageOption[] };
+  return Array.isArray(payload.languages) ? payload.languages : [];
+}
+
+export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath: string }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -457,6 +552,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath
   useEffect(() => {
     const roots = Array.from(document.querySelectorAll<HTMLElement>(".wp-clone-root"));
     const cleanups: Array<() => void> = [];
+    let cancelled = false;
 
     roots.forEach((root) => {
       applyVisualRepairs(root);
@@ -604,7 +700,17 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: Locale; pagePath
       });
     });
 
+    void loadLanguageOptions(pagePath)
+      .then((languages) => {
+        if (cancelled || languages.length < 2) return;
+        roots.forEach((root) => {
+          cleanups.push(ensureLanguageMenu(root, languages));
+        });
+      })
+      .catch(() => {});
+
     return () => {
+      cancelled = true;
       cleanups.forEach((cleanup) => cleanup());
       document.body.classList.remove("wp-clone-menu-open");
     };

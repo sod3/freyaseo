@@ -4,7 +4,8 @@ import { draftMode } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CmsSectionRenderer } from "@/src/components/cms/CmsSectionRenderer";
 import { WpClonePage } from "@/src/components/wp-clone/WpClonePage";
-import { getAlternatePath, normalizePath, siteUrl as fallbackSiteUrl } from "@/src/content/route-map";
+import { getAlternatePath, normalizePath, routeMap, siteUrl as fallbackSiteUrl } from "@/src/content/route-map";
+import { activeLanguages, composeLanguagePath, detectLanguageFromPath, getLanguageSettings, stripLanguagePrefix } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
 import {
   getWpClonePageByPath as getLegacyWpClonePageByPath,
@@ -13,12 +14,11 @@ import {
 } from "@/src/content/wp-clone/pages";
 import { readCollection } from "./reader";
 
-type Locale = "en" | "el";
+type Locale = string;
 type CmsStatus = "published" | "draft" | "hidden";
 
 type LocalizedString = {
-  en?: string;
-  el?: string;
+  [locale: string]: string | undefined;
 };
 
 type CmsSeo = {
@@ -61,7 +61,8 @@ type CmsRedirectEntry = {
   active?: boolean;
 };
 
-export type CmsWpClonePage = WpClonePageData & {
+export type CmsWpClonePage = Omit<WpClonePageData, "locale"> & {
+  locale: Locale;
   status: CmsStatus;
   alternatePath?: string;
   renderMode?: "wordpressHtml" | "structuredBlocks";
@@ -77,7 +78,8 @@ function absoluteUrl(pathOrUrl?: string | null) {
 }
 
 function localized(value: LocalizedString | undefined, locale: Locale) {
-  return value?.[locale] || value?.en || value?.el || undefined;
+  if (!value) return undefined;
+  return value[locale] || value.en || value.el || Object.values(value).find(Boolean) || undefined;
 }
 
 function normalizeForLookup(pathname: string) {
@@ -189,11 +191,28 @@ export async function redirectFromCmsIfNeeded(pathname: string): Promise<never |
   redirect(cmsRedirect.destinationUrl);
 }
 
-export function metadataForCmsWpClonePage(page: CmsWpClonePage): Metadata {
+function languageAlternatePath(basePath: string, languageCode: string, settings: Awaited<ReturnType<typeof getLanguageSettings>>) {
+  const language = settings.languages.find((item) => item.code === languageCode);
+  if (!language) return basePath;
+  if (language.code === "el" && basePath in routeMap) return routeMap[basePath as keyof typeof routeMap];
+  return composeLanguagePath(basePath, language, settings.defaultLanguage);
+}
+
+export async function metadataForCmsWpClonePage(page: CmsWpClonePage): Promise<Metadata> {
+  const languageSettings = await getLanguageSettings();
+  const languages = activeLanguages(languageSettings);
   const locale = page.locale;
-  const alternatePath = page.alternatePath || getAlternatePath(page.path);
-  const enPath = locale === "en" ? page.path : alternatePath;
-  const elPath = locale === "el" ? page.path : alternatePath;
+  const detectedLocale = detectLanguageFromPath(page.path, languageSettings);
+  const currentLanguage = languages.find((language) => language.code === locale || language.code === detectedLocale) || languages[0];
+  const fallbackAlternatePath = page.alternatePath || getAlternatePath(page.path);
+  const basePath = locale === "el" && fallbackAlternatePath ? fallbackAlternatePath : stripLanguagePrefix(page.path, currentLanguage);
+  const languageAlternates = Object.fromEntries(
+    languages.map((language) => {
+      const href = language.code === locale ? page.path : languageAlternatePath(basePath, language.code, languageSettings);
+      return [language.code, absoluteUrl(href) || href];
+    }),
+  );
+  const defaultAlternate = languageAlternates[languageSettings.defaultLanguage] || absoluteUrl(basePath) || basePath;
   const title = localized(page.seo?.title, locale) || page.title;
   const description = localized(page.seo?.description, locale) || page.description || undefined;
   const canonical = absoluteUrl(page.seo?.canonicalUrl || page.path);
@@ -206,9 +225,8 @@ export function metadataForCmsWpClonePage(page: CmsWpClonePage): Metadata {
     alternates: {
       canonical,
       languages: {
-        en: absoluteUrl(enPath),
-        el: absoluteUrl(elPath),
-        "x-default": absoluteUrl(enPath),
+        ...languageAlternates,
+        "x-default": defaultAlternate,
       },
     },
     robots: {

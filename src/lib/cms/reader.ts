@@ -10,6 +10,7 @@ const singletonKeys: Record<string, string> = {
   footerSettings: "footer",
   seoSettings: "seo",
   contactFormSettings: "contact",
+  languageSettings: "languages",
 };
 
 const collectionNames: Record<string, string> = {

@@ -1,5 +1,6 @@
 import type { Collection, Document, Sort } from "mongodb";
 import { documentId, isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
+import { activeLanguages, getLanguageSettings } from "@/src/lib/cms/languages";
 import { collectionModuleNames, settingModuleKeys } from "./module-config";
 import { getAdminModule, type AdminModuleSlug } from "./modules";
 
@@ -59,10 +60,15 @@ export type AdminPageInfo = {
   hasNext: boolean;
 };
 
-function localized(value: unknown, preferred: "en" | "el" = "en") {
+function localized(value: unknown, preferred = "en") {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const copy = value as Partial<Record<"en" | "el", string>>;
-  return copy[preferred] || copy.en || copy.el || "";
+  const copy = value as Record<string, unknown>;
+  const direct = copy[preferred];
+  if (typeof direct === "string") return direct;
+  if (typeof copy.en === "string") return copy.en;
+  if (typeof copy.el === "string") return copy.el;
+  const fallback = Object.values(copy).find((item) => typeof item === "string" && item.trim());
+  return typeof fallback === "string" ? fallback : "";
 }
 
 function statusLabel(value?: string | null) {
@@ -141,12 +147,9 @@ const blogListProjection = {
   updatedAt: 1,
 };
 
-function missingLocalizedObjectFilter(field: string) {
+function missingLocalizedObjectFilter(field: string, languageCodes: string[]) {
   return {
-    $and: [
-      { $or: [{ [`${field}.en`]: { $exists: false } }, { [`${field}.en`]: "" }] },
-      { $or: [{ [`${field}.el`]: { $exists: false } }, { [`${field}.el`]: "" }] },
-    ],
+    $or: languageCodes.map((code) => ({ $or: [{ [`${field}.${code}`]: { $exists: false } }, { [`${field}.${code}`]: "" }] })),
   };
 }
 
@@ -222,6 +225,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     mongoCollection("mediaAssets"),
     mongoCollection<Record<string, unknown>>("auditLogs"),
   ]);
+  const languageSettings = await getLanguageSettings();
+  const languageCodes = activeLanguages(languageSettings).map((language) => language.code);
+  const requiredLocaleCount = Math.max(1, languageCodes.length);
   const [
     pageCount,
     blogPostCount,
@@ -249,7 +255,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .aggregate<{ count: number }>([
         { $group: { _id: { $ifNull: ["$translationKey", { $ifNull: ["$translationGroup", "$path"] }] }, locales: { $addToSet: { $ifNull: ["$locale", "en"] } } } },
         { $project: { localeCount: { $size: "$locales" } } },
-        { $match: { localeCount: { $lt: 2 } } },
+        { $match: { localeCount: { $lt: requiredLocaleCount } } },
         { $count: "count" },
       ])
       .toArray(),
@@ -257,13 +263,13 @@ export async function getDashboardData(): Promise<DashboardData> {
       .aggregate<{ count: number }>([
         { $group: { _id: { $ifNull: ["$translationGroup", "$slug"] }, locales: { $addToSet: { $ifNull: ["$language", { $ifNull: ["$locale", "en"] }] } } } },
         { $project: { localeCount: { $size: "$locales" } } },
-        { $match: { localeCount: { $lt: 2 } } },
+        { $match: { localeCount: { $lt: requiredLocaleCount } } },
         { $count: "count" },
       ])
       .toArray(),
-    pages.countDocuments(missingLocalizedObjectFilter("seo.description")),
-    blogPosts.countDocuments(missingLocalizedObjectFilter("seo.description")),
-    mediaAssets.countDocuments({ decorative: { $ne: true }, ...missingLocalizedObjectFilter("alt") }),
+    pages.countDocuments(missingLocalizedObjectFilter("seo.description", languageCodes)),
+    blogPosts.countDocuments(missingLocalizedObjectFilter("seo.description", languageCodes)),
+    mediaAssets.countDocuments({ decorative: { $ne: true }, ...missingLocalizedObjectFilter("alt", languageCodes) }),
     auditLogs.find({}).sort({ createdAt: -1 }).limit(6).toArray(),
     formSubmissions.find({ deletedAt: { $ne: true } }).sort({ createdAt: -1 }).limit(8).toArray(),
   ]);

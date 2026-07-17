@@ -6,6 +6,15 @@ import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import type { Document, Filter } from "mongodb";
 import { documentId, idFilter, isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
+import {
+  activeLanguages,
+  getLanguageSettings,
+  isValidLanguageCode,
+  languagePathPrefix,
+  normalizeLanguageCode,
+  normalizeLanguageSettings,
+  type CmsLanguageSettings,
+} from "@/src/lib/cms/languages";
 import { saveUpload, StorageUploadError } from "@/src/lib/storage";
 import {
   can,
@@ -45,7 +54,7 @@ const recordSchema = z.object({
   title: z.string().min(1).max(220),
   description: z.string().optional(),
   status: z.string().optional(),
-  language: z.enum(["en", "el"]).optional(),
+  language: z.string().trim().transform(normalizeLanguageCode).refine(isValidLanguageCode).optional(),
   path: z.string().optional(),
   slug: z.string().optional(),
   category: z.string().optional(),
@@ -148,6 +157,18 @@ function parseTags(value?: string | null) {
         .filter(Boolean),
     ),
   );
+}
+
+async function pathPrefixForLanguage(locale: string) {
+  const settings = await getLanguageSettings();
+  const language = settings.languages.find((item) => item.code === locale);
+  return languagePathPrefix(locale, settings.defaultLanguage, language?.pathPrefix);
+}
+
+async function blogPathForLanguage(locale: string, slug: string) {
+  if (locale === "el") return `/el/seo-blog/${slug}/`;
+  const prefix = await pathPrefixForLanguage(locale);
+  return prefix ? `${prefix}/blog/${slug}/` : `/blog/${slug}/`;
 }
 
 function escapeHtmlText(value: string) {
@@ -406,7 +427,7 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
   if (!current) throw new Error("Page not found.");
   const nextPath = data.path || String(current.path || "");
   const now = new Date();
-  const locale = String(current.locale || data.language || "en");
+  const locale = normalizeLanguageCode(data.language || String(current.locale || "en"));
   const previousSeoTitle = typeof (typeof current.seo === "object" && current.seo ? (current.seo as Record<string, unknown>).title : null) === "object"
     ? (((current.seo as Record<string, unknown>).title as Record<string, unknown>) || {})
     : {};
@@ -434,6 +455,7 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
       title: data.title,
       description: data.description || "",
       status: cmsStatus(data.status),
+      locale,
       path: nextPath,
       slug: data.slug || current.slug,
       category: data.category || current.category || "",
@@ -484,9 +506,10 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
 
 async function createPageRecord(data: z.infer<typeof recordSchema>) {
   const pages = await mongoCollection<Record<string, unknown>>("pages");
-  const locale = data.language || "en";
+  const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `page-${Date.now()}`);
-  const path = data.path || (locale === "el" ? `/el/${slug}/` : `/${slug}/`);
+  const prefix = await pathPrefixForLanguage(locale);
+  const path = data.path || (prefix ? `${prefix}/${slug}/` : `/${slug}/`);
   const now = new Date();
   const result = await pages.insertOne({
     sourceSlug: slug,
@@ -531,10 +554,10 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
   const posts = await mongoCollection<Record<string, unknown>>("blogPosts");
   const current = await posts.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Blog post not found.");
-  const locale = String(current.language || current.locale || data.language || "en");
+  const locale = normalizeLanguageCode(data.language || String(current.language || current.locale || "en"));
   const slug = data.slug || String(current.slug || "");
   const now = new Date();
-  const canonical = data.canonicalUrl || (locale === "el" ? `/el/seo-blog/${slug}/` : `/blog/${slug}/`);
+  const canonical = data.canonicalUrl || (await blogPathForLanguage(locale, slug));
   const bodyHtml = cleanEditorHtml(data.bodyHtml ?? String(current.bodyHtml || current.bodyMarkdown || ""));
   const previousSeoTitle = typeof (typeof current.seo === "object" && current.seo ? (current.seo as Record<string, unknown>).title : null) === "object"
     ? (((current.seo as Record<string, unknown>).title as Record<string, unknown>) || {})
@@ -552,6 +575,8 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
       legacySections: [],
       status: cmsStatus(data.status),
       draft: cmsStatus(data.status) !== "published",
+      language: locale,
+      locale,
       slug,
       category: data.category || current.category || "",
       tags: parseTags(data.tags),
@@ -578,14 +603,15 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
 
 async function createBlogRecord(data: z.infer<typeof recordSchema>) {
   const posts = await mongoCollection<Record<string, unknown>>("blogPosts");
-  const locale = data.language || "en";
+  const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `post-${Date.now()}`);
   const now = new Date();
-  const canonical = data.canonicalUrl || (locale === "el" ? `/el/seo-blog/${slug}/` : `/blog/${slug}/`);
+  const canonical = data.canonicalUrl || (await blogPathForLanguage(locale, slug));
   const result = await posts.insertOne({
     slug,
     title: data.title,
     language: locale,
+    locale,
     excerpt: data.description || "",
     bodyHtml: cleanEditorHtml(data.bodyHtml || ""),
     bodyMarkdown: "",
@@ -655,12 +681,12 @@ export async function saveRecordAction(formData: FormData) {
     } else if (data.module === "blog" && data.id) {
       const updated = await updateBlogRecord(data);
       await audit("content.updated", "blog", updated.id, updated.title, { module: data.module, user: user.email });
-      revalidatePath(updated.locale === "el" ? `/el/seo-blog/${updated.slug}/` : `/blog/${updated.slug}/`);
+      revalidatePath(await blogPathForLanguage(updated.locale, updated.slug));
       revalidateCmsTags("cms-blog");
     } else if (data.module === "blog") {
       const created = await createBlogRecord(data);
       await audit("content.created", "blog", created.id, created.title, { module: data.module, user: user.email });
-      revalidatePath(created.locale === "el" ? `/el/seo-blog/${created.slug}/` : `/blog/${created.slug}/`);
+      revalidatePath(await blogPathForLanguage(created.locale, created.slug));
       revalidateCmsTags("cms-blog");
     } else {
       await audit("content.update_skipped", data.module, data.id, data.title, { reason: "Module uses JSON editor." });
@@ -690,6 +716,9 @@ export async function saveJsonRecordAction(formData: FormData) {
   let record: Record<string, unknown> = {};
   try {
     record = parseEditableJson(parsed.data.jsonData);
+    if (moduleSlug === "languages") {
+      record = normalizeLanguageSettings(record as Partial<CmsLanguageSettings>) as unknown as Record<string, unknown>;
+    }
   } catch {
     safeAdminRedirect(`/admin/${moduleSlug}?error=json`);
   }
@@ -704,6 +733,21 @@ export async function saveJsonRecordAction(formData: FormData) {
       },
       { upsert: true },
     );
+    if (moduleSlug === "languages") {
+      const languageRecord = record as unknown as CmsLanguageSettings;
+      await (await mongoCollection("settings")).updateOne(
+        { key: "site-settings" },
+        {
+          $set: {
+            "value.defaultLanguage": languageRecord.defaultLanguage,
+            "value.availableLanguages": languageRecord.languages.filter((language) => language.active !== false).map((language) => language.code),
+            updatedAt: now,
+          },
+          $setOnInsert: { key: "site-settings", createdAt: now },
+        },
+        { upsert: true },
+      );
+    }
   } else if (storage.collectionName) {
     const collection = await mongoCollection(storage.collectionName);
     if (parsed.data.id && parsed.data.id !== "new") {
@@ -777,6 +821,13 @@ export async function uploadMediaAction(formData: FormData) {
   try {
     const stored = await saveUpload(file as File);
     const title = String(formData.get("title") || stored.originalFileName);
+    const languageSettings = await getLanguageSettings();
+    const alt = Object.fromEntries(
+      activeLanguages(languageSettings).map((language) => [
+        language.code,
+        String(formData.get(`alt_${language.code}`) || (language.code === "en" ? formData.get("altEn") : null) || (language.code === "el" ? formData.get("altEl") : null) || ""),
+      ]),
+    );
     const asset = {
       fileName: stored.fileName,
       originalFileName: stored.originalFileName,
@@ -786,7 +837,7 @@ export async function uploadMediaAction(formData: FormData) {
       storageDriver: stored.storageDriver,
       mimeType: stored.mimeType,
       fileSize: stored.fileSize,
-      alt: { en: String(formData.get("altEn") || ""), el: String(formData.get("altEl") || "") },
+      alt,
       caption: { en: "", el: "" },
       description: { en: "", el: "" },
       decorative: formBoolean(formData, "decorative"),

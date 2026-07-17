@@ -1,8 +1,7 @@
-type Locale = "en" | "el";
+type Locale = string;
 
 type LocalizedString = {
-  en?: string;
-  el?: string;
+  [locale: string]: string | undefined;
 };
 
 type CmsSection = {
@@ -13,7 +12,7 @@ type CmsSection = {
 function localized(value: unknown, locale: Locale) {
   if (!value || typeof value !== "object") return "";
   const copy = value as LocalizedString;
-  return copy[locale] || copy.en || copy.el || "";
+  return copy[locale] || copy.en || copy.el || Object.values(copy).find(Boolean) || "";
 }
 
 function sectionEnabled(value: Record<string, unknown> | undefined) {

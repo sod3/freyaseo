@@ -1,6 +1,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { can, getCurrentAdminUser, getRequestMeta } from "@/src/lib/admin/auth";
+import { activeLanguages, getLanguageSettings } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
 import { saveUpload, StorageUploadError } from "@/src/lib/storage";
 
@@ -41,6 +42,13 @@ export async function POST(request: Request) {
     const stored = await saveUpload(file as File);
     const title = String(formData.get("title") || stored.originalFileName);
     const now = new Date();
+    const languageSettings = await getLanguageSettings();
+    const alt = Object.fromEntries(
+      activeLanguages(languageSettings).map((language) => [
+        language.code,
+        String(formData.get(`alt_${language.code}`) || (language.code === "en" ? formData.get("altEn") : null) || (language.code === "el" ? formData.get("altEl") : null) || ""),
+      ]),
+    );
     const asset = {
       fileName: stored.fileName,
       originalFileName: stored.originalFileName,
@@ -50,7 +58,7 @@ export async function POST(request: Request) {
       storageDriver: stored.storageDriver,
       mimeType: stored.mimeType,
       fileSize: stored.fileSize,
-      alt: { en: String(formData.get("altEn") || ""), el: String(formData.get("altEl") || "") },
+      alt,
       caption: { en: "", el: "" },
       description: { en: "", el: "" },
       decorative: false,

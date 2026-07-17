@@ -16,6 +16,7 @@ export const collectionModuleNames: Partial<Record<AdminModuleSlug, string>> = {
 export const settingModuleKeys: Partial<Record<AdminModuleSlug, string>> = {
   navigation: "navigation",
   footer: "footer",
+  languages: "languages",
   seo: "seo",
   "google-integrations": "marketing",
   settings: "site-settings",
@@ -32,6 +33,7 @@ export const editableCmsModules = new Set<AdminModuleSlug>([
   "media",
   "navigation",
   "footer",
+  "languages",
   "seo",
   "google-integrations",
   "redirects",
@@ -53,7 +55,7 @@ export const creatableCmsModules = new Set<AdminModuleSlug>([
 
 export function writePermissionForModule(module: AdminModuleSlug) {
   if (module === "seo") return "seo.write";
-  if (module === "google-integrations" || module === "settings") return "settings.manage";
+  if (module === "google-integrations" || module === "settings" || module === "languages") return "settings.manage";
   if (module === "media") return "media.write";
   if (module === "forms") return "forms.read";
   return "content.write";
@@ -67,7 +69,7 @@ export function getModuleStorage(module: AdminModuleSlug) {
 }
 
 export function revalidationPathsForModule(module: AdminModuleSlug) {
-  if (module === "navigation" || module === "footer" || module === "seo" || module === "google-integrations" || module === "settings") {
+  if (module === "navigation" || module === "footer" || module === "languages" || module === "seo" || module === "google-integrations" || module === "settings") {
     return ["/", "/sitemap.xml", "/robots.txt"];
   }
   if (module === "forms") return ["/contact-2/", "/el/lets-contact/"];
@@ -159,6 +161,36 @@ export function defaultJsonForModule(module: AdminModuleSlug): JsonObject {
       successMessage: { en: "Thank you.", el: "" },
       errorMessage: { en: "Please check the form.", el: "" },
       active: true,
+    };
+  }
+
+  if (module === "languages") {
+    return {
+      defaultLanguage: "en",
+      languages: [
+        {
+          code: "en",
+          name: "English",
+          nativeName: "English",
+          shortLabel: "EN",
+          flagEmoji: "",
+          pathPrefix: "",
+          textDirection: "ltr",
+          active: true,
+          isDefault: true,
+        },
+        {
+          code: "el",
+          name: "Greek",
+          nativeName: "Greek",
+          shortLabel: "EL",
+          flagEmoji: "",
+          pathPrefix: "/el",
+          textDirection: "ltr",
+          active: true,
+          isDefault: false,
+        },
+      ],
     };
   }
 

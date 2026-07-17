@@ -25,6 +25,32 @@ select {
   font: inherit;
 }
 
+.language-switcher {
+  align-items: center;
+  border: 1px solid rgba(183, 239, 124, 0.28);
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.language-switcher-list a {
+  border-radius: 999px;
+  color: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  text-decoration: none;
+}
+
+.language-switcher-list a[aria-current="page"] {
+  background: rgba(183, 239, 124, 0.18);
+  color: #b7ef7c;
+}
+
 .wp-clone-root {
   min-height: 100vh;
   overflow-x: hidden;
@@ -186,6 +212,25 @@ body.wp-clone-menu-open {
 .wp-clone-root .elementskit-dropdown,
 .wp-clone-root .elementskit-submenu-panel {
   max-width: min(320px, calc(100vw - 32px));
+}
+
+.wp-clone-root .freya-language-menu {
+  position: relative;
+}
+
+.wp-clone-root .freya-language-toggle,
+.wp-clone-root .freya-language-option {
+  align-items: center;
+  display: inline-flex !important;
+  gap: 6px;
+}
+
+.wp-clone-root .freya-language-dropdown {
+  min-width: 150px !important;
+}
+
+.wp-clone-root .freya-language-option.active {
+  color: var(--e-global-color-accent, #b7ef7c) !important;
 }
 
 @media (min-width: 1025px) {

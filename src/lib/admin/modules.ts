@@ -35,6 +35,7 @@ export type AdminModuleSlug =
   | "media"
   | "navigation"
   | "footer"
+  | "languages"
   | "seo"
   | "google-integrations"
   | "redirects"
@@ -65,6 +66,7 @@ export const adminModules: AdminModule[] = [
   { slug: "media", label: "Media", description: "Upload, replace, tag and audit media assets.", permission: "content.read", icon: GalleryHorizontalEnd },
   { slug: "navigation", label: "Header", description: "Edit header menu labels, order, visibility and dropdowns.", permission: "content.read", icon: Navigation },
   { slug: "footer", label: "Footer", description: "Edit footer copy, links, social profiles and contact details.", permission: "content.read", icon: ContactRound },
+  { slug: "languages", label: "Languages", description: "Add, edit and activate website languages.", permission: "settings.manage", icon: Globe2 },
   { slug: "seo", label: "SEO", description: "Review metadata, canonical URLs, schema and indexability.", permission: "seo.write", icon: Search },
   { slug: "google-integrations", label: "Google Integrations", description: "Configure analytics, tags and verification IDs.", permission: "integrations.write", icon: Globe2 },
   { slug: "redirects", label: "Redirects", description: "Manage legacy URLs and slug-change redirects.", permission: "content.read", icon: Link2 },
@@ -77,7 +79,7 @@ export const adminModules: AdminModule[] = [
 ];
 
 export const adminPrimaryModules = adminModules.filter((item) =>
-  ["dashboard", "pages", "blog", "services", "tools", "media", "forms", "seo", "settings"].includes(item.slug),
+  ["dashboard", "pages", "blog", "services", "tools", "media", "forms", "languages", "seo", "settings"].includes(item.slug),
 );
 
 export function getAdminModule(slug: string) {
