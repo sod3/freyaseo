@@ -2536,7 +2536,10 @@ body.wp-clone-menu-open {
   visibility: visible !important;
   transform: none !important;
   transform-origin: bottom center !important;
-  animation: freya-chart-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+  animation: none !important;
+  animation-delay: 0ms !important;
+  transition: none !important;
+  clip-path: none !important;
   flex: 1 1 0 !important;
   min-width: 12px !important;
   min-height: 48px !important;
@@ -2546,24 +2549,13 @@ body.wp-clone-menu-open {
 }
 
 .wp-clone-root.home .perf-chart-container .perf-bar:nth-child(1) { height: 35% !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(2) { height: 58% !important; animation-delay: 60ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(3) { height: 45% !important; animation-delay: 120ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(4) { height: 68% !important; animation-delay: 180ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(5) { height: 50% !important; animation-delay: 240ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(6) { height: 82% !important; animation-delay: 300ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(7) { height: 72% !important; animation-delay: 360ms !important; }
-.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(8) { height: 95% !important; animation-delay: 420ms !important; }
-
-@keyframes freya-chart-rise {
-  from {
-    clip-path: inset(100% 0 0 0);
-    opacity: 0.45;
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
-}
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(2) { height: 58% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(3) { height: 45% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(4) { height: 68% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(5) { height: 50% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(6) { height: 82% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(7) { height: 72% !important; }
+.wp-clone-root.home .perf-chart-container .perf-bar:nth-child(8) { height: 95% !important; }
 
 @media (max-width: 700px) {
   .wp-clone-root.home .perf-chart-container {
