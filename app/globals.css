@@ -1680,6 +1680,11 @@ body.wp-clone-menu-open {
   --width: 100% !important;
 }
 
+.wp-clone-root.home .elementor-element-49b6611 {
+  width: 100% !important;
+  --width: 100% !important;
+}
+
 .wp-clone-root.home .e-con.e-parent:has(.perf-analytics-card) .e-con:has(> .elementor-widget-heading + .elementor-widget-heading) {
   display: flex !important;
   flex-direction: column !important;
@@ -1971,11 +1976,27 @@ body.wp-clone-menu-open {
 
 .wp-clone-root.home .e-con.e-parent:has(.custom-profile-card):has(.custom-contact-form) > .e-con-inner > .e-con {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  --width: 100% !important;
+}
+
+.wp-clone-root.home .elementor-element-d04e5db {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   align-items: stretch !important;
   gap: clamp(48px, 5vw, 78px) !important;
   width: 100% !important;
-  max-width: none !important;
+  padding: 0 !important;
+  --width: 100% !important;
+}
+
+.wp-clone-root.home .elementor-element-d04e5db > .e-con {
+  width: 100% !important;
+  padding: 0 !important;
   --width: 100% !important;
 }
 
@@ -2237,6 +2258,10 @@ body.wp-clone-menu-open {
 @media (max-width: 900px) {
   .wp-clone-root.home .e-con.e-parent:has(.perf-analytics-card) > .e-con-inner > .e-con,
   .wp-clone-root.home .e-con.e-parent:has(.custom-profile-card):has(.custom-contact-form) > .e-con-inner > .e-con {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .wp-clone-root.home .elementor-element-d04e5db {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
