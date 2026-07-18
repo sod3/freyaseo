@@ -19,10 +19,14 @@ export function LanguageSwitcher({ pathname }: { pathname: string }) {
   const copy = getCommon(locale).language;
   const alternate = getAlternatePath(pathname);
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
+  const resolvedAlternate = languages.find((language) => !language.current);
 
   useEffect(() => {
     let mounted = true;
-    fetch(`/api/languages?path=${encodeURIComponent(pathname)}`, { headers: { accept: "application/json" } })
+    const query = typeof window === "undefined" ? "" : window.location.search.replace(/^\?/, "");
+    const params = new URLSearchParams({ path: pathname });
+    if (query) params.set("query", query);
+    fetch(`/api/languages?${params.toString()}`, { headers: { accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))
       .then((payload: { languages?: LanguageOption[] } | null) => {
         if (mounted && Array.isArray(payload?.languages)) setLanguages(payload.languages);
@@ -47,9 +51,9 @@ export function LanguageSwitcher({ pathname }: { pathname: string }) {
   }
 
   return (
-    <Link href={alternate} className="language-switcher" aria-label={`${copy.label}: ${copy.alternate}`}>
+    <Link href={resolvedAlternate?.href || alternate} className="language-switcher" aria-label={`${copy.label}: ${resolvedAlternate?.label || copy.alternate}`}>
       <Languages className="h-4 w-4" aria-hidden />
-      <span>{copy.alternate}</span>
+      <span>{resolvedAlternate?.shortLabel || copy.alternate}</span>
     </Link>
   );
 }

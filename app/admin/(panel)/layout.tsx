@@ -13,7 +13,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
   const visibleModules = adminModules.filter((item) => can(user, item.permission));
   const visibleModuleBySlug = new Map(visibleModules.map((item) => [item.slug, item]));
   const modulesFor = (slugs: AdminModuleSlug[]) => slugs.map((slug) => visibleModuleBySlug.get(slug)).filter((item): item is AdminModule => Boolean(item));
-  const primaryModules = modulesFor(["dashboard", "pages", "media", "blog", "navigation", "footer", "seo", "forms"]);
+  const primaryModules = modulesFor(["dashboard", "pages", "media", "blog", "navigation", "footer", "languages", "seo", "forms"]);
   const contentModules = modulesFor(["services", "tools", "certificates", "faqs", "testimonials", "taxonomy"]);
   const settingsModules = modulesFor(["redirects", "google-integrations", "users", "settings", "audit-logs", "backups"]);
   const renderModule = (item: (typeof visibleModules)[number]) => {

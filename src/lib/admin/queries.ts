@@ -13,6 +13,13 @@ export type AdminRecord = {
   href?: string;
   updatedAt?: Date | null;
   meta?: string;
+  translations?: Array<{
+    locale: string;
+    label: string;
+    status: string;
+    href?: string;
+    id?: string;
+  }>;
 };
 
 export type DashboardData = {
@@ -117,8 +124,16 @@ function mapFormSubmission(submission: Record<string, unknown>): FormSubmissionR
 function filterRecords(records: AdminRecord[], search?: string, language?: string, status?: string) {
   const term = search?.trim().toLowerCase();
   return records.filter((record) => {
-    if (term && !`${record.title} ${record.description || ""} ${record.href || ""}`.toLowerCase().includes(term)) return false;
-    if (language && language !== "all" && record.language !== language) return false;
+    const translationText = (record.translations || []).map((translation) => `${translation.locale} ${translation.status} ${translation.href || ""}`).join(" ");
+    if (term && !`${record.title} ${record.description || ""} ${record.href || ""} ${translationText}`.toLowerCase().includes(term)) return false;
+    if (
+      language &&
+      language !== "all" &&
+      record.language !== language &&
+      !record.translations?.some((translation) => translation.locale === language && translation.id)
+    ) {
+      return false;
+    }
     if (status && status !== "all" && record.status?.toLowerCase() !== status.toLowerCase()) return false;
     return true;
   });
@@ -129,8 +144,12 @@ const pageListProjection = {
   description: 1,
   status: 1,
   locale: 1,
+  language: 1,
   path: 1,
   sourceSlug: 1,
+  translationKey: 1,
+  translationGroup: 1,
+  alternatePath: 1,
   category: 1,
   tags: 1,
   updatedAt: 1,
@@ -192,6 +211,25 @@ function pageAreaLabel(path: string) {
   if (path.includes("contact") || path.includes("lets-contact")) return "Contact page";
   if (path.includes("blog")) return "Blog listing";
   return "Website page";
+}
+
+function pageGroupKey(page: Record<string, unknown>) {
+  const explicit = String(page.translationKey || page.translationGroup || "").trim();
+  if (explicit) return explicit;
+  const alternate = String(page.alternatePath || "").trim();
+  if (alternate) return `alternate:${alternate}`;
+  return `path:${String(page.path || documentId(page))}`;
+}
+
+function pageLocaleValue(page: Record<string, unknown>) {
+  return String(page.locale || page.language || "en").trim().toLowerCase() || "en";
+}
+
+function pageTranslationStatus(page: Record<string, unknown> | undefined) {
+  if (!page) return "Missing";
+  const status = statusLabel(String(page.status || "published")) || "Published";
+  if (status.toLowerCase() === "published") return "Complete";
+  return status;
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -376,24 +414,52 @@ export async function getModuleRecords(
 
   if (slug === "pages") {
     const collection = await mongoCollection<Record<string, unknown>>("pages");
-    const { documents: pages, total } = await readPagedDocuments(collection, pageListProjection, { locale: 1, path: 1 });
-    records = pages.map((page) => ({
-      id: documentId(page),
-      title: String(page.title || ""),
-      description: String(page.description || ""),
-      status: statusLabel(String(page.status || "published")),
-      language: String(page.locale || ""),
-      href: String(page.path || ""),
-      updatedAt: page.updatedAt instanceof Date ? page.updatedAt : null,
-      meta: [
-        pageAreaLabel(String(page.path || "")),
-        String(page.category || ""),
-        Array.isArray(page.tags) && page.tags.length ? `Tags: ${page.tags.map(String).join(", ")}` : "",
-      ]
-        .filter(Boolean)
-        .join(" - "),
-    })).sort((left, right) => pageSortRank(left.href || "") - pageSortRank(right.href || "") || (left.href || "").localeCompare(right.href || ""));
-    if (total !== null) return buildResponse(records, total);
+    const pages = await collection.find({ deletedAt: { $ne: true } }, { projection: pageListProjection }).sort({ locale: 1, path: 1 }).limit(500).toArray();
+    const grouped = new Map<string, Record<string, unknown>[]>();
+    const languageSettings = await getLanguageSettings();
+    const languages = activeLanguages(languageSettings);
+
+    pages.forEach((page) => {
+      const key = pageGroupKey(page);
+      const group = grouped.get(key) || [];
+      group.push(page);
+      grouped.set(key, group);
+    });
+
+    records = Array.from(grouped.values())
+      .map((group) => {
+        const byLocale = new Map(group.map((page) => [pageLocaleValue(page), page]));
+        const primary = byLocale.get(languageSettings.defaultLanguage) || group[0];
+        const translations = languages.map((language) => {
+          const translation = byLocale.get(language.code);
+          return {
+            locale: language.code,
+            label: language.name || language.nativeName || language.code.toUpperCase(),
+            status: pageTranslationStatus(translation),
+            href: translation ? String(translation.path || "") : undefined,
+            id: translation ? documentId(translation) : undefined,
+          };
+        });
+        const missingCount = translations.filter((translation) => !translation.id).length;
+        return {
+          id: documentId(primary),
+          title: String(primary.title || ""),
+          description: String(primary.description || ""),
+          status: missingCount ? "Needs translation" : "Complete",
+          language: translations.map((translation) => `${translation.locale.toUpperCase()}: ${translation.status}`).join(", "),
+          href: String(primary.path || ""),
+          updatedAt: primary.updatedAt instanceof Date ? primary.updatedAt : null,
+          meta: [
+            pageAreaLabel(String(primary.path || "")),
+            String(primary.category || ""),
+            Array.isArray(primary.tags) && primary.tags.length ? `Tags: ${primary.tags.map(String).join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join(" - "),
+          translations,
+        } satisfies AdminRecord;
+      })
+      .sort((left, right) => pageSortRank(left.href || "") - pageSortRank(right.href || "") || (left.href || "").localeCompare(right.href || ""));
   } else if (slug === "blog") {
     const collection = await mongoCollection<Record<string, unknown>>("blogPosts");
     const { documents: posts, total } = await readPagedDocuments(collection, blogListProjection, { updatedAt: -1 });

@@ -51,3 +51,33 @@ test("keeps admin pages private", async () => {
   assert.ok([307, 308].includes(dashboard.status));
   assert.match(dashboard.headers.get("location") ?? "", /\/admin\/login\/?$/);
 });
+
+test("resolves page language alternates from CMS translation keys", async () => {
+  const response = await render("/api/languages?path=%2Fabout%2F");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/i);
+
+  const payload = await response.json();
+  const greek = payload.languages.find((language) => language.code === "el");
+  assert.equal(greek.href, "/el/about-us/");
+  assert.equal(greek.exists, true);
+});
+
+test("renders default-language fallback when a selected page translation is missing", async () => {
+  const response = await render("/el/about/");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /wp-clone-root/);
+  assert.match(html, /data-page-path="\/el\/about\/"/);
+  assert.match(html, /data-fallback-source-path="\/about\/"/);
+});
+
+test("renders article fallback instead of 404 for a missing translated blog slug", async () => {
+  const response = await render("/el/seo-blog/what-is-b2b-seo/");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /What Is B2B SEO/i);
+  assert.doesNotMatch(html, /This page could not be found/i);
+});

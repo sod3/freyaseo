@@ -4,18 +4,20 @@ import { draftMode } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { CmsSectionRenderer } from "@/src/components/cms/CmsSectionRenderer";
 import { WpClonePage } from "@/src/components/wp-clone/WpClonePage";
-import { getAlternatePath, normalizePath, routeMap, siteUrl as fallbackSiteUrl } from "@/src/content/route-map";
-import { activeLanguages, composeLanguagePath, detectLanguageFromPath, getLanguageSettings, stripLanguagePrefix } from "@/src/lib/cms/languages";
+import { normalizePath, siteUrl as fallbackSiteUrl } from "@/src/content/route-map";
+import { getLanguageSettings } from "@/src/lib/cms/languages";
+import { resolveCmsPageAlternates, resolveCmsPageForPath, type CmsRouteResolution } from "@/src/lib/cms/routing";
 import { isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
 import {
   getWpClonePageByPath as getLegacyWpClonePageByPath,
   wpClonePagesByPath,
   type WpClonePageData,
 } from "@/src/content/wp-clone/pages";
+import { getCmsPageRouteIndex, readLocalCmsPageBySourceSlug, type CmsPageRouteEntry } from "./page-index";
 import { readCollection } from "./reader";
 
 type Locale = string;
-type CmsStatus = "published" | "draft" | "hidden";
+type CmsStatus = "published" | "draft" | "hidden" | "soft_deleted";
 
 type LocalizedString = {
   [locale: string]: string | undefined;
@@ -45,6 +47,9 @@ type CmsPageEntry = {
   description?: string;
   path: string;
   locale: Locale;
+  language?: Locale;
+  translationKey?: string;
+  translationGroup?: string;
   status?: CmsStatus;
   alternatePath?: string;
   bodyClass?: string;
@@ -52,6 +57,7 @@ type CmsPageEntry = {
   renderMode?: "wordpressHtml" | "structuredBlocks";
   sections?: Array<{ discriminant: string; value?: Record<string, unknown> }>;
   seo?: CmsSeo;
+  deletedAt?: unknown;
 };
 
 type CmsRedirectEntry = {
@@ -63,11 +69,20 @@ type CmsRedirectEntry = {
 
 export type CmsWpClonePage = Omit<WpClonePageData, "locale"> & {
   locale: Locale;
+  language?: Locale;
   status: CmsStatus;
+  translationKey?: string;
+  translationGroup?: string;
   alternatePath?: string;
   renderMode?: "wordpressHtml" | "structuredBlocks";
   sections?: Array<{ discriminant: string; value?: Record<string, unknown> }>;
   seo?: CmsSeo;
+  deletedAt?: unknown;
+  translationFallback?: {
+    requestedLocale: string;
+    sourceLocale: string;
+    sourcePath: string;
+  };
 };
 
 function absoluteUrl(pathOrUrl?: string | null) {
@@ -107,7 +122,7 @@ const readCachedMongoPageByPath = unstable_cache(
     if (!isMongoConfigured()) return null;
     return withMongo(async () => {
       const pages = await mongoCollection<CmsPageEntry>("pages");
-      return pages.findOne({ path: normalized });
+      return pages.findOne({ path: normalized, deletedAt: { $ne: true }, status: { $ne: "soft_deleted" } });
     }, null);
   },
   ["cms-page-by-path"],
@@ -132,13 +147,51 @@ function toCmsPage(slug: string, entry: CmsPageEntry): CmsWpClonePage {
     description: entry.description || "",
     path: normalizeForLookup(entry.path || `/${slug}/`),
     locale: entry.locale,
+    language: entry.language,
     status: entry.status ?? "published",
+    translationKey: entry.translationKey,
+    translationGroup: entry.translationGroup,
     alternatePath: entry.alternatePath ? normalizeForLookup(entry.alternatePath) : undefined,
     bodyClass: entry.bodyClass || "",
     html: entry.html || "",
     renderMode: entry.renderMode ?? "wordpressHtml",
     sections: entry.sections,
     seo: entry.seo,
+    deletedAt: entry.deletedAt,
+  };
+}
+
+function getLegacyCmsPages(): CmsWpClonePage[] {
+  return Object.values(wpClonePagesByPath).map((page) => ({
+    ...page,
+    path: normalizeForLookup(page.path),
+    locale: page.locale,
+    status: "published" as const,
+    renderMode: "wordpressHtml" as const,
+  }));
+}
+
+function applyTranslationFallback(
+  page: CmsWpClonePage,
+  resolution: Pick<CmsRouteResolution<CmsWpClonePage>, "isFallback" | "requestedLocale" | "requestedPath" | "sourceLocale" | "sourcePath">,
+) {
+  if (!resolution.isFallback || !resolution.sourceLocale || !resolution.sourcePath) return page;
+
+  return {
+    ...page,
+    path: resolution.requestedPath,
+    locale: resolution.requestedLocale,
+    alternatePath: resolution.sourcePath,
+    seo: {
+      ...page.seo,
+      canonicalUrl: page.seo?.canonicalUrl || resolution.sourcePath,
+      robotsIndex: false,
+    },
+    translationFallback: {
+      requestedLocale: resolution.requestedLocale,
+      sourceLocale: resolution.sourceLocale,
+      sourcePath: resolution.sourcePath,
+    },
   };
 }
 
@@ -148,21 +201,46 @@ export async function getAllCmsWpClonePages() {
 }
 
 export async function getAllWpClonePagePaths() {
-  const cmsPages = await getAllCmsWpClonePages();
+  const cmsPages = await getCmsPageRouteIndex();
   const cmsPaths = cmsPages.map((page) => page.path);
   return Array.from(new Set([...cmsPaths, ...Object.keys(wpClonePagesByPath)]));
+}
+
+async function getFullCmsPageForRouteEntry(entry: CmsPageRouteEntry) {
+  const normalized = normalizeForLookup(entry.path);
+
+  if (shouldReadMongo() && isMongoConfigured()) {
+    const mongoPage = await readCachedMongoPageByPath(normalized);
+    if (mongoPage) return toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage);
+  }
+
+  const sourceSlug = entry.sourceSlug || entry.slug;
+  if (!sourceSlug) return null;
+
+  const localPage = await readLocalCmsPageBySourceSlug<CmsPageEntry>(sourceSlug);
+  return localPage ? toCmsPage(sourceSlug, localPage) : null;
 }
 
 export async function getCmsWpClonePageByPath(pathname: string) {
   const normalized = normalizeForLookup(pathname);
   const drafts = await draftModeEnabled();
   const mongoPage = shouldReadMongo() && isMongoConfigured() ? await readCachedMongoPageByPath(normalized) : null;
-  const localPage = !mongoPage ? (await getAllCmsWpClonePages()).find((item) => normalizeForLookup(item.path) === normalized) || null : null;
-  const resolvedPage = mongoPage ? toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage) : localPage;
+  const resolvedPage = mongoPage ? toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage) : null;
 
   if (resolvedPage) {
     if (resolvedPage.status === "published" || drafts) return resolvedPage;
-    return null;
+  }
+
+  const languageSettings = await getLanguageSettings();
+  const cmsPages = await getCmsPageRouteIndex();
+  const legacyPages = getLegacyCmsPages();
+  const pages = [...cmsPages, ...legacyPages];
+  const resolution = resolveCmsPageForPath(pages, normalized, languageSettings, { includeDrafts: drafts });
+  if (resolution.page) {
+    const routeEntry = resolution.page as CmsPageRouteEntry;
+    const fullPage =
+      routeEntry.sourceSlug || routeEntry.slug ? await getFullCmsPageForRouteEntry(routeEntry) : (resolution.page as CmsWpClonePage);
+    return fullPage ? applyTranslationFallback(fullPage, resolution) : null;
   }
 
   const legacyPage = getLegacyWpClonePageByPath(normalized);
@@ -191,31 +269,19 @@ export async function redirectFromCmsIfNeeded(pathname: string): Promise<never |
   redirect(cmsRedirect.destinationUrl);
 }
 
-function languageAlternatePath(basePath: string, languageCode: string, settings: Awaited<ReturnType<typeof getLanguageSettings>>) {
-  const language = settings.languages.find((item) => item.code === languageCode);
-  if (!language) return basePath;
-  if (language.code === "el" && basePath in routeMap) return routeMap[basePath as keyof typeof routeMap];
-  return composeLanguagePath(basePath, language, settings.defaultLanguage);
-}
-
 export async function metadataForCmsWpClonePage(page: CmsWpClonePage): Promise<Metadata> {
   const languageSettings = await getLanguageSettings();
-  const languages = activeLanguages(languageSettings);
   const locale = page.locale;
-  const detectedLocale = detectLanguageFromPath(page.path, languageSettings);
-  const currentLanguage = languages.find((language) => language.code === locale || language.code === detectedLocale) || languages[0];
-  const fallbackAlternatePath = page.alternatePath || getAlternatePath(page.path);
-  const basePath = locale === "el" && fallbackAlternatePath ? fallbackAlternatePath : stripLanguagePrefix(page.path, currentLanguage);
-  const languageAlternates = Object.fromEntries(
-    languages.map((language) => {
-      const href = language.code === locale ? page.path : languageAlternatePath(basePath, language.code, languageSettings);
-      return [language.code, absoluteUrl(href) || href];
-    }),
-  );
-  const defaultAlternate = languageAlternates[languageSettings.defaultLanguage] || absoluteUrl(basePath) || basePath;
+  const pages = [...(await getCmsPageRouteIndex()), ...getLegacyCmsPages()];
+  const { alternates } = resolveCmsPageAlternates(pages, page.path, languageSettings);
+  const languageAlternates = Object.fromEntries(alternates.map((alternate) => [alternate.code, absoluteUrl(alternate.href) || alternate.href]));
+  const defaultAlternate =
+    languageAlternates[languageSettings.defaultLanguage] ||
+    absoluteUrl(page.translationFallback?.sourcePath || page.seo?.canonicalUrl || page.path) ||
+    page.path;
   const title = localized(page.seo?.title, locale) || page.title;
   const description = localized(page.seo?.description, locale) || page.description || undefined;
-  const canonical = absoluteUrl(page.seo?.canonicalUrl || page.path);
+  const canonical = absoluteUrl(page.translationFallback?.sourcePath || page.seo?.canonicalUrl || page.path);
   const ogImage = absoluteUrl(page.seo?.openGraphImage || "/og.png");
   const twitterImage = absoluteUrl(page.seo?.twitterImage || page.seo?.openGraphImage || "/og.png");
 
@@ -230,7 +296,7 @@ export async function metadataForCmsWpClonePage(page: CmsWpClonePage): Promise<M
       },
     },
     robots: {
-      index: page.status === "published" && page.seo?.robotsIndex !== false,
+      index: !page.translationFallback && page.status === "published" && page.seo?.robotsIndex !== false,
       follow: page.seo?.robotsFollow !== false,
     },
     openGraph: {
@@ -238,7 +304,7 @@ export async function metadataForCmsWpClonePage(page: CmsWpClonePage): Promise<M
       description: localized(page.seo?.openGraphDescription, locale) || description,
       url: canonical,
       siteName: "Freya SEO",
-      locale: locale === "el" ? "el_GR" : "en_US",
+      locale: locale === "el" ? "el_GR" : locale === "en" ? "en_US" : locale,
       type: "website",
       images: ogImage
         ? [

@@ -6,7 +6,7 @@ import { can, createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { creatableCmsModules, editableCmsModules } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
 import { getModuleRecords } from "@/src/lib/admin/queries";
-import { activeLanguages, getLanguageSettings, languageLabel as cmsLanguageLabel } from "@/src/lib/cms/languages";
+import { activeLanguages, getLanguageSettings, languageLabel as cmsLanguageLabel, type CmsLanguage } from "@/src/lib/cms/languages";
 import { AdminRecordEditor } from "@/src/components/admin/AdminRecordEditor";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +38,17 @@ const importantPageAreas = [
 ];
 
 const adminErrorMessages: Record<string, string> = {
+  "duplicate-path": "This page address is already being used. Choose a different slug or URL path.",
+  "invalid-path": "Use a valid page address, such as /about/.",
+  "reserved-path": "That page address is reserved by the website. Choose a normal public page path.",
   "storage-configuration": "media storage is not configured for uploads",
   "storage-permission": "media storage rejected the upload credentials; update the Cloudinary or S3 key so it can create assets",
   upload: "media upload failed",
 };
+
+function adminLanguageLabel(language: CmsLanguage) {
+  return language.name || cmsLanguageLabel(language);
+}
 
 function adminStatusMessage(value: string) {
   return adminErrorMessages[value] || value.replace(/-/g, " ");
@@ -158,7 +165,7 @@ export default async function AdminModulePage({
                 <input
                   className="admin-input"
                   name={`alt_${language.code}`}
-                  placeholder={`${cmsLanguageLabel(language)} alt text`}
+                  placeholder={`${adminLanguageLabel(language)} alt text`}
                   key={language.code}
                 />
               ))}
@@ -186,7 +193,7 @@ export default async function AdminModulePage({
             <option value="all">All</option>
             {languages.map((language) => (
               <option value={language.code} key={language.code}>
-                {cmsLanguageLabel(language)}
+                {adminLanguageLabel(language)}
               </option>
             ))}
           </select>
@@ -246,7 +253,31 @@ export default async function AdminModulePage({
                     {record.meta ? <div className="admin-muted">{record.meta}</div> : null}
                   </td>
                   <td>{record.status || ""}</td>
-                  <td>{record.language || ""}</td>
+                  <td>
+                    {record.translations?.length ? (
+                      <div className="admin-language-status-list">
+                        {record.translations.map((translation) =>
+                          translation.id ? (
+                            <Link
+                              className={`admin-language-status admin-language-status-${translation.status.toLowerCase().replace(/\s+/g, "-")}`}
+                              href={`/admin/${adminModule.slug}?edit=${translation.id}`}
+                              key={translation.locale}
+                            >
+                              <strong>{translation.label}</strong>
+                              <span>{translation.status}</span>
+                            </Link>
+                          ) : (
+                            <span className="admin-language-status admin-language-status-missing" key={translation.locale}>
+                              <strong>{translation.label}</strong>
+                              <span>Missing</span>
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    ) : (
+                      record.language || ""
+                    )}
+                  </td>
                   <td>{record.href || ""}</td>
                   <td>{record.updatedAt?.toLocaleDateString() || ""}</td>
                   <td>

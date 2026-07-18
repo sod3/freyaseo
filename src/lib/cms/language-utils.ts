@@ -45,6 +45,41 @@ export const fallbackLanguageSettings: CmsLanguageSettings = {
 
 const languageCodePattern = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/;
 
+const knownLanguageDefaults: Record<string, Pick<CmsLanguage, "name" | "nativeName" | "shortLabel" | "textDirection">> = {
+  en: { name: "English", nativeName: "English", shortLabel: "EN", textDirection: "ltr" },
+  el: { name: "Greek", nativeName: "Greek", shortLabel: "EL", textDirection: "ltr" },
+  fr: { name: "French", nativeName: "Francais", shortLabel: "FR", textDirection: "ltr" },
+  de: { name: "German", nativeName: "Deutsch", shortLabel: "DE", textDirection: "ltr" },
+  es: { name: "Spanish", nativeName: "Espanol", shortLabel: "ES", textDirection: "ltr" },
+  it: { name: "Italian", nativeName: "Italiano", shortLabel: "IT", textDirection: "ltr" },
+  pt: { name: "Portuguese", nativeName: "Portugues", shortLabel: "PT", textDirection: "ltr" },
+  tr: { name: "Turkish", nativeName: "Turkce", shortLabel: "TR", textDirection: "ltr" },
+  nl: { name: "Dutch", nativeName: "Nederlands", shortLabel: "NL", textDirection: "ltr" },
+  ar: { name: "Arabic", nativeName: "Arabic", shortLabel: "AR", textDirection: "rtl" },
+};
+
+function normalizedText(value?: string) {
+  return String(value || "").trim().toLowerCase();
+}
+
+const knownDefaultTexts = new Set(
+  Object.values(knownLanguageDefaults).flatMap((language) => [language.name, language.nativeName || "", language.shortLabel || ""]).map(normalizedText),
+);
+
+function knownTextsForCode(code: string) {
+  const defaults = knownLanguageDefaults[code];
+  return new Set([defaults?.name, defaults?.nativeName || "", defaults?.shortLabel || ""].map(normalizedText));
+}
+
+function shouldUseKnownDefault(code: string, value?: string) {
+  const normalized = normalizedText(value);
+  const defaults = knownLanguageDefaults[code];
+  if (!defaults) return !normalized;
+  if (!normalized || normalized === "new language" || normalized === code) return true;
+  if (knownTextsForCode(code).has(normalized)) return false;
+  return knownDefaultTexts.has(normalized);
+}
+
 export function normalizeLanguageCode(value: string) {
   return value.trim().toLowerCase();
 }
@@ -71,17 +106,25 @@ function cleanLanguage(language: CmsLanguage, defaultLanguage: string): CmsLangu
   const code = normalizeLanguageCode(language.code || "");
   if (!isValidLanguageCode(code)) return null;
 
-  const name = String(language.name || code.toUpperCase()).trim();
+  const defaults = knownLanguageDefaults[code];
+  const rawName = String(language.name || "").trim();
+  const rawNativeName = String(language.nativeName || "").trim();
+  const rawShortLabel = String(language.shortLabel || "").trim();
+  const name = defaults && shouldUseKnownDefault(code, rawName) ? defaults.name : rawName || defaults?.name || code.toUpperCase();
+  const nativeName =
+    defaults && shouldUseKnownDefault(code, rawNativeName) ? defaults.nativeName || name : rawNativeName || defaults?.nativeName || name;
+  const shortLabel =
+    defaults && shouldUseKnownDefault(code, rawShortLabel) ? defaults.shortLabel || code.toUpperCase() : rawShortLabel || defaults?.shortLabel || code.toUpperCase();
   const isDefault = code === normalizeLanguageCode(defaultLanguage) || language.isDefault === true;
 
   return {
     code,
     name,
-    nativeName: String(language.nativeName || name).trim(),
-    shortLabel: String(language.shortLabel || code.toUpperCase()).trim(),
+    nativeName,
+    shortLabel,
     flagEmoji: String(language.flagEmoji || "").trim(),
     pathPrefix: languagePathPrefix(code, defaultLanguage, language.pathPrefix),
-    textDirection: language.textDirection === "rtl" ? "rtl" : "ltr",
+    textDirection: language.textDirection === "rtl" || defaults?.textDirection === "rtl" ? "rtl" : "ltr",
     active: language.active !== false,
     isDefault,
   };

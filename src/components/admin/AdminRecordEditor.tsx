@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import type { Collection } from "mongodb";
 import { normalizePath, routeMap } from "@/src/content/route-map";
-import { saveJsonRecordAction, saveRecordAction } from "@/src/lib/admin/actions";
+import { createPageTranslationAction, saveJsonRecordAction, saveRecordAction } from "@/src/lib/admin/actions";
 import { createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { defaultJsonForModule, editableCmsModules, getModuleStorage, writePermissionForModule } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
@@ -44,6 +44,7 @@ type LanguageVersion = {
   id?: string;
   title: string;
   path: string;
+  status: string;
   current: boolean;
 };
 
@@ -69,6 +70,10 @@ function pageLocale(document: Record<string, unknown>, languages: CmsLanguage[],
   const path = normalizePath(String(document.path || "/"));
   const match = languages.find((language) => language.pathPrefix && path.startsWith(`${language.pathPrefix}/`));
   return match?.code || defaultLanguage;
+}
+
+function adminLanguageLabel(language: CmsLanguage) {
+  return language.name || cmsLanguageLabel(language);
 }
 
 function exactAlternatePath(pathname: string) {
@@ -111,6 +116,16 @@ function editableJson(document: Record<string, unknown>) {
   delete copy.updatedAt;
   delete copy.deletedAt;
   return JSON.stringify(copy, null, 2);
+}
+
+function translationStatus(document?: Record<string, unknown>) {
+  if (!document) return "Missing";
+  const status = String(document.status || "published").toLowerCase();
+  if (status === "published") return "Complete";
+  if (status === "draft") return "Draft";
+  if (status === "in_review") return "In review";
+  if (status === "scheduled") return "Scheduled";
+  return status.replace(/_/g, " ").replace(/^\w/, (char) => char.toUpperCase());
 }
 
 function emptyRecord(overrides: Partial<EditRecord> = {}): EditRecord {
@@ -180,7 +195,6 @@ async function getPageLanguageVersions(
   languages: CmsLanguage[],
   defaultLanguage: string,
 ): Promise<LanguageVersion[]> {
-  const currentLocale = pageLocale(page, languages, defaultLanguage);
   const currentPath = normalizePath(String(page.path || "/"));
   const alternatePath = String(page.alternatePath || exactAlternatePath(currentPath) || "");
   const normalizedAlternatePath = alternatePath ? normalizePath(alternatePath) : "";
@@ -192,10 +206,11 @@ async function getPageLanguageVersions(
     const language = languages.find((item) => item.code === locale);
     versions.set(locale, {
       locale,
-      label: language ? cmsLanguageLabel(language) : locale.toUpperCase(),
+      label: language ? adminLanguageLabel(language) : locale.toUpperCase(),
       id: documentId(document),
       title: displayTitle(document.title, locale) || String(document.path || ""),
       path: normalizePath(String(document.path || "")),
+      status: translationStatus(document),
       current,
     });
   };
@@ -206,7 +221,7 @@ async function getPageLanguageVersions(
     const linkedPages = await pages
       .find(
         { translationKey, deletedAt: { $ne: true } },
-        { projection: { _id: 1, title: 1, path: 1, locale: 1, translationKey: 1, deletedAt: 1 } },
+        { projection: { _id: 1, title: 1, path: 1, locale: 1, language: 1, translationKey: 1, deletedAt: 1 } },
       )
       .toArray();
 
@@ -218,21 +233,11 @@ async function getPageLanguageVersions(
   if (normalizedAlternatePath) {
     const alternate = await pages.findOne(
       { path: normalizedAlternatePath },
-      { projection: { _id: 1, title: 1, path: 1, locale: 1, deletedAt: 1 } },
+      { projection: { _id: 1, title: 1, path: 1, locale: 1, language: 1, deletedAt: 1 } },
     );
 
     if (alternate && !alternate.deletedAt) {
       addDocument(alternate, false);
-    } else {
-      const missingLocale = languages.find((language) => language.code !== currentLocale)?.code || defaultLanguage;
-      const language = languages.find((item) => item.code === missingLocale);
-      versions.set(missingLocale, {
-        locale: missingLocale,
-        label: language ? cmsLanguageLabel(language) : missingLocale.toUpperCase(),
-        title: "Translation not created yet",
-        path: normalizedAlternatePath,
-        current: false,
-      });
     }
   }
 
@@ -245,9 +250,10 @@ async function getPageLanguageVersions(
     const missingPath = prefix ? `${prefix}/${currentSlug}/`.replace(/\/{2,}/g, "/") : `/${currentSlug}/`;
     return {
       locale: language.code,
-      label: cmsLanguageLabel(language),
+      label: adminLanguageLabel(language),
       title: "Translation not created yet",
       path: missingPath,
+      status: "Missing",
       current: false,
     };
   });
@@ -320,28 +326,39 @@ async function getRecord(moduleSlug: string, id: string, languages: CmsLanguage[
   return null;
 }
 
-function LanguageVersionSwitcher({ versions }: { versions?: LanguageVersion[] }) {
+function LanguageVersionSwitcher({ versions, sourcePageId }: { versions?: LanguageVersion[]; sourcePageId?: string }) {
   if (!versions || versions.length < 2) return null;
 
   return (
     <section className="admin-language-switcher" aria-label="Page language versions">
       <div>
         <strong>Language version</strong>
-        <p className="admin-muted">Choose English or Greek, then edit that page version below.</p>
+        <p className="admin-muted">Choose a page language, or create the version you need.</p>
       </div>
       <div className="admin-language-options">
+        {sourcePageId ? <input type="hidden" name="sourcePageId" value={sourcePageId} /> : null}
         {versions.map((version) =>
           version.current ? (
             <span className="admin-language-pill admin-language-pill-active" key={version.locale} aria-current="page">
-              {version.label}
+              {version.label}: {version.status}
             </span>
           ) : version.id ? (
             <Link className="admin-language-pill" key={version.locale} href={`/admin/pages?edit=${version.id}`}>
-              {version.label}
+              {version.label}: {version.status}
             </Link>
+          ) : sourcePageId ? (
+            <button
+              className="admin-language-pill admin-language-pill-create"
+              formAction={createPageTranslationAction.bind(null, version.locale)}
+              key={version.locale}
+              title={version.path}
+              type="submit"
+            >
+              Add {version.label} translation
+            </button>
           ) : (
-            <span className="admin-language-pill admin-language-pill-disabled" key={version.locale} title={version.path}>
-              {version.label} missing
+            <span className="admin-language-pill admin-language-pill-disabled" key={version.locale}>
+              {version.label}: Missing
             </span>
           ),
         )}
@@ -398,7 +415,7 @@ export async function AdminRecordEditor({ moduleSlug, id }: { moduleSlug: string
           <input type="hidden" name="csrfToken" value={csrfToken} />
           <input type="hidden" name="module" value={adminModule.slug} />
           {record.id ? <input type="hidden" name="id" value={record.id} /> : null}
-          {adminModule.slug === "pages" ? <LanguageVersionSwitcher versions={record.languageVersions} /> : null}
+          {adminModule.slug === "pages" ? <LanguageVersionSwitcher versions={record.languageVersions} sourcePageId={record.id} /> : null}
 
           <section className="admin-editor-section">
             <h2>Page details</h2>
@@ -418,7 +435,7 @@ export async function AdminRecordEditor({ moduleSlug, id }: { moduleSlug: string
                 <select className="admin-select" name="language" defaultValue={record.language}>
                   {languages.map((language) => (
                     <option value={language.code} key={language.code}>
-                      {cmsLanguageLabel(language)}
+                      {adminLanguageLabel(language)}
                     </option>
                   ))}
                 </select>

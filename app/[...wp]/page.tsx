@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ArticleTemplate } from "@/src/components/blog/ArticleTemplate";
+import { getCmsBlogPost, parseCmsBlogPath } from "@/src/lib/cms/blog";
+import { getLanguageSettings } from "@/src/lib/cms/languages";
 import {
   generateWpCloneMetadata,
   getAllWpClonePagePaths,
@@ -7,29 +10,10 @@ import {
   redirectFromCmsIfNeeded,
   WpClonePageForPath,
 } from "@/src/lib/cms/wp-pages";
+import { allStaticRoutes } from "@/src/content/route-map";
+import { pageMetadata } from "@/src/lib/metadata";
 
-const directRoutePaths = new Set([
-  "/",
-  "/seo-marketing/",
-  "/ai-seo-2/",
-  "/automation/",
-  "/report/",
-  "/tool-generation/",
-  "/certificates/",
-  "/about/",
-  "/blog/",
-  "/contact-2/",
-  "/el/seo-agency/",
-  "/el/seo-marketing-2/",
-  "/el/ai-seo-4/",
-  "/el/automation-2/",
-  "/el/report-2/",
-  "/el/tool-generation-2/",
-  "/el/certificates-seo/",
-  "/el/about-us/",
-  "/el/seo-blog/",
-  "/el/lets-contact/",
-]);
+const directRoutePaths = new Set(allStaticRoutes);
 
 type PageProps = {
   params: Promise<{
@@ -64,7 +48,24 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { wp = [] } = await params;
-  return generateWpCloneMetadata(toPath(wp));
+  const pathname = toPath(wp);
+  const languageSettings = await getLanguageSettings();
+  const blogPath = parseCmsBlogPath(pathname, languageSettings);
+
+  if (blogPath) {
+    const locale = blogPath.locale === "el" ? "el" : "en";
+    const post = await getCmsBlogPost(locale, blogPath.slug);
+    if (post) {
+      return pageMetadata({
+        title: post.seoTitle,
+        description: post.metaDescription,
+        path: pathname,
+        locale,
+      });
+    }
+  }
+
+  return generateWpCloneMetadata(pathname);
 }
 
 export default async function Page({ params }: PageProps) {
@@ -72,6 +73,16 @@ export default async function Page({ params }: PageProps) {
   const pathname = toPath(wp);
 
   await redirectFromCmsIfNeeded(pathname);
+  const languageSettings = await getLanguageSettings();
+  const blogPath = parseCmsBlogPath(pathname, languageSettings);
+
+  if (blogPath) {
+    const locale = blogPath.locale === "el" ? "el" : "en";
+    const post = await getCmsBlogPost(locale, blogPath.slug);
+    if (!post) notFound();
+    return <ArticleTemplate post={post} />;
+  }
+
   const page = await getCmsWpClonePageByPath(pathname);
 
   if (!page) {

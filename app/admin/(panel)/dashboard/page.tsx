@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { getDashboardData } from "@/src/lib/admin/queries";
 import { quickCreateModules } from "@/src/lib/admin/modules";
 
@@ -67,19 +67,6 @@ export default async function AdminDashboardPage() {
             );
           })}
         </div>
-      </section>
-
-      <section className="admin-panel">
-        <h2>Health warnings</h2>
-        {dashboard.warnings.length ? (
-          dashboard.warnings.map((warning) => (
-            <p className="admin-alert" key={warning}>
-              <AlertTriangle size={16} aria-hidden /> {warning}
-            </p>
-          ))
-        ) : (
-          <p className="admin-muted">No content health warnings right now.</p>
-        )}
       </section>
 
       <section className="admin-panel">
