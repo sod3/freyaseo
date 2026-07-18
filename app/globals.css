@@ -1083,6 +1083,50 @@ body.wp-clone-menu-open {
   .wp-clone-root .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) .perf-analytics-card:not(:has(.perf-stats)) {
     height: auto;
   }
+
+  /* Greek service translations do not all preserve Elementor's inner wrapper.
+     Promote the two section columns into one grid so they match the English UI. */
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) {
+    display: grid !important;
+    grid-template-columns: minmax(380px, 0.95fr) minmax(420px, 1.05fr) !important;
+    align-items: start !important;
+    gap: clamp(22px, 2.4vw, 34px) !important;
+    width: var(--freya-container) !important;
+    max-width: 1240px !important;
+    margin-inline: auto !important;
+  }
+
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner {
+    display: contents !important;
+  }
+
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner > .e-con,
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 22px !important;
+    width: var(--freya-container) !important;
+    margin-inline: auto !important;
+  }
+
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner {
+    display: contents !important;
+  }
+
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner > .e-con,
+  .wp-clone-root[data-locale="el"] .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
 }
 
 @media (max-width: 640px) {
