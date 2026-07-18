@@ -40,13 +40,39 @@ const greekAiSeoStats = `
   <div class="perf-stat"><h4>10<span>k+</span></h4><p>ΛΕΞΕΙΣ-ΚΛΕΙΔΙΑ</p></div>
 </div>`;
 
-function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
-  if (page.path !== "/el/ai-seo-4/" || page.html.includes('class="perf-stats"')) {
-    return page.html;
+function markServiceComparisonSection(html: string) {
+  const chartIndex = html.indexOf('class="perf-analytics-card"');
+  const offerIndex = html.indexOf("seo-service-text-card");
+  if (chartIndex < 0 || offerIndex < chartIndex) return html;
+
+  const sectionPattern = /<div class="([^"]*\be-con-boxed\b[^"]*\be-parent\b[^"]*)"([^>]*)><div class="e-con-inner">/g;
+  let sectionMatch: RegExpExecArray | null = null;
+  let candidate: RegExpExecArray | null;
+
+  while ((candidate = sectionPattern.exec(html)) && candidate.index < chartIndex) {
+    sectionMatch = candidate;
   }
 
-  const chartEnd = '<div class="perf-bar" style="height: 90%;"></div></div></div>';
-  return page.html.replace(chartEnd, `${chartEnd}${greekAiSeoStats}`);
+  if (!sectionMatch || sectionMatch[1].includes("freya-service-comparison")) return html;
+
+  const markedSection = sectionMatch[0].replace(
+    `class="${sectionMatch[1]}"`,
+    `class="${sectionMatch[1]} freya-service-comparison"`,
+  );
+
+  return `${html.slice(0, sectionMatch.index)}${markedSection}${html.slice(sectionMatch.index + sectionMatch[0].length)}`;
+}
+
+function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
+  if (!serviceDetailPaths.has(page.path)) return page.html;
+
+  let html = page.html;
+  if (page.path === "/el/ai-seo-4/" && !html.includes('class="perf-stats"')) {
+    const chartEnd = '<div class="perf-bar" style="height: 90%;"></div></div></div>';
+    html = html.replace(chartEnd, `${chartEnd}${greekAiSeoStats}`);
+  }
+
+  return markServiceComparisonSection(html);
 }
 
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {

@@ -1027,7 +1027,7 @@ body.wp-clone-menu-open {
 }
 
 @media (min-width: 901px) {
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) {
+  .wp-clone-root.service-detail-page .freya-service-comparison {
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
@@ -1038,7 +1038,35 @@ body.wp-clone-menu-open {
     margin-inline: 0 !important;
   }
 
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card),
+  .wp-clone-root.service-detail-page .freya-service-comparison > .e-con-inner {
+    display: grid !important;
+    grid-template-columns: minmax(380px, 0.95fr) minmax(420px, 1.05fr);
+    align-items: start !important;
+    gap: clamp(22px, 2.4vw, 34px) !important;
+    width: var(--freya-container) !important;
+    max-width: 1240px !important;
+    margin-inline: auto !important;
+  }
+
+  .wp-clone-root.service-detail-page .freya-service-comparison > .e-con-inner > .e-con {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+
+  .wp-clone-root.service-detail-page .freya-service-comparison .elementor-widget-html,
+  .wp-clone-root.service-detail-page .freya-service-comparison .perf-analytics-card,
+  .wp-clone-root.service-detail-page .freya-service-comparison .seo-service-text-card {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+  }
+
+  .wp-clone-root.service-detail-page .freya-service-comparison .perf-chart-container {
+    min-height: 240px;
+  }
+
   .wp-clone-root .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.elementor-widget-html .fs-blog-card) {
     display: grid !important;
     grid-template-columns: minmax(380px, 0.95fr) minmax(420px, 1.05fr);
@@ -1049,44 +1077,20 @@ body.wp-clone-menu-open {
     margin-inline: auto !important;
   }
 
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) {
-    align-items: start !important;
-  }
-
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner {
-    width: var(--freya-container) !important;
-    max-width: 1240px !important;
-    margin-inline: auto !important;
-  }
-
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner,
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-full,
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner > .e-con,
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con,
   .wp-clone-root .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.elementor-widget-html .fs-blog-card) > .e-con {
     width: 100% !important;
     max-width: none !important;
     height: auto !important;
   }
 
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con-inner > .e-con > .elementor-widget-html,
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) .elementor-widget-html,
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) .perf-analytics-card,
-  .wp-clone-root.service-detail-page .e-con-boxed:has(.seo-service-text-card):has(.perf-analytics-card) .seo-service-text-card,
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) .elementor-widget-html,
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) .perf-analytics-card,
   .wp-clone-root .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.elementor-widget-html .fs-blog-card) .elementor-widget-html,
   .wp-clone-root .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.elementor-widget-html .fs-blog-card) .fs-blog-card {
-    height: auto;
-  }
-
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) .perf-analytics-card:not(:has(.perf-stats)) {
     height: auto;
   }
 }
 
 @media (max-width: 900px) {
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) {
+  .wp-clone-root.service-detail-page .freya-service-comparison > .e-con-inner {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
     gap: 22px !important;
@@ -1094,7 +1098,7 @@ body.wp-clone-menu-open {
     margin-inline: auto !important;
   }
 
-  .wp-clone-root.service-detail-page .e-con-boxed > .e-con-inner:has(.seo-service-text-card):has(.perf-analytics-card) > .e-con {
+  .wp-clone-root.service-detail-page .freya-service-comparison > .e-con-inner > .e-con {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
