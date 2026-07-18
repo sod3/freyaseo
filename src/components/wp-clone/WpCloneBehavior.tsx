@@ -690,12 +690,43 @@ function prepareRevealAnimations(root: HTMLElement) {
 }
 
 function preparePerformanceGraphAnimations(root: HTMLElement) {
-  root.querySelectorAll<HTMLElement>(".perf-chart-container").forEach((chart) => {
+  const charts = Array.from(root.querySelectorAll<HTMLElement>(".perf-chart-container, .perf-bars")).filter((chart) =>
+    chart.querySelector(".perf-bar"),
+  );
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  charts.forEach((chart) => {
+    if (chart.dataset.freyaBarsPrepared === "true") return;
     chart.dataset.freyaBarsPrepared = "true";
-    chart.classList.add("freya-bars-ready", "freya-bars-visible");
+    chart.classList.add("freya-bars-ready");
+    chart.querySelectorAll<HTMLElement>(".perf-bar").forEach((bar, index) => {
+      bar.style.setProperty("--freya-bar-index", String(index));
+    });
+    if (reducedMotion) chart.classList.add("freya-bars-visible");
   });
 
-  return () => {};
+  const preparedCharts = charts.filter((chart) => chart.classList.contains("freya-bars-ready"));
+  if (!preparedCharts.length || reducedMotion) return () => {};
+
+  if (!("IntersectionObserver" in window)) {
+    preparedCharts.forEach((chart) => chart.classList.add("freya-bars-visible"));
+    return () => {};
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const chart = entry.target as HTMLElement;
+        chart.classList.add("freya-bars-visible");
+        observer.unobserve(chart);
+      });
+    },
+    { rootMargin: "0px 0px 10% 0px", threshold: 0.2 },
+  );
+
+  preparedCharts.forEach((chart) => observer.observe(chart));
+  return () => observer.disconnect();
 }
 
 function applyVisualRepairs(root: HTMLElement) {
