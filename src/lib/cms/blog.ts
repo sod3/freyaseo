@@ -2,6 +2,8 @@ import { draftMode } from "next/headers";
 import { unstable_cache } from "next/cache";
 import sanitizeHtml from "sanitize-html";
 import { blogPosts as legacyBlogPosts } from "@/src/content/blog";
+import { normalizePath } from "@/src/content/route-map";
+import { activeLanguages, composeLanguagePath, type CmsLanguageSettings } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
 import type { BlogPost, Locale } from "@/src/types";
 import { readCollection } from "./reader";
@@ -32,6 +34,11 @@ type CmsBlogPostEntry = {
   };
 };
 
+export type CmsBlogPathMatch = {
+  locale: string;
+  slug: string;
+};
+
 function localized(value: LocalizedString | undefined, locale: Locale) {
   return value?.[locale] || value?.en || value?.el || "";
 }
@@ -41,6 +48,27 @@ function shouldReadMongo() {
   if (source === "local") return false;
   if (source === "mongo") return true;
   return true;
+}
+
+export function cmsBlogIndexPathForLocale(locale: string, settings: CmsLanguageSettings) {
+  if (locale === "el") return "/el/seo-blog/";
+  const language = activeLanguages(settings).find((item) => item.code === locale);
+  return normalizePath(composeLanguagePath("/blog/", language || settings.languages[0], settings.defaultLanguage));
+}
+
+export function cmsBlogPostPathForLocale(locale: string, slug: string, settings: CmsLanguageSettings) {
+  return normalizePath(`${cmsBlogIndexPathForLocale(locale, settings)}${slug}/`);
+}
+
+export function parseCmsBlogPath(pathname: string, settings: CmsLanguageSettings): CmsBlogPathMatch | null {
+  const normalized = normalizePath(pathname);
+  for (const language of activeLanguages(settings)) {
+    const indexPath = cmsBlogIndexPathForLocale(language.code, settings);
+    if (!normalized.startsWith(indexPath)) continue;
+    const slug = normalized.slice(indexPath.length).replace(/\/$/g, "");
+    if (slug && !slug.includes("/")) return { locale: language.code, slug };
+  }
+  return null;
 }
 
 function escapeHtml(value: string) {
@@ -221,7 +249,14 @@ function toBlogPost(slug: string, entry: CmsBlogPostEntry): BlogPost {
   };
 }
 
-export async function getCmsBlogPosts(locale: Locale) {
+function withFallbackLocale(post: BlogPost, locale: Locale): BlogPost {
+  return {
+    ...post,
+    locale,
+  };
+}
+
+export async function getCmsBlogPosts(locale: Locale): Promise<BlogPost[]> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
     const records = drafts
@@ -264,7 +299,7 @@ export async function getCmsBlogPosts(locale: Locale) {
   return legacyBlogPosts[locale];
 }
 
-export async function getCmsBlogPost(locale: Locale, slug: string) {
+export async function getCmsBlogPost(locale: Locale, slug: string): Promise<BlogPost | null> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
     const record = drafts
@@ -278,10 +313,18 @@ export async function getCmsBlogPost(locale: Locale, slug: string) {
   }
 
   const posts = await getLocalCmsBlogPosts(locale);
-  return posts.find((post) => post.slug === slug) || legacyBlogPosts[locale].find((post) => post.slug === slug) || null;
+  const localPost = posts.find((post) => post.slug === slug) || legacyBlogPosts[locale].find((post) => post.slug === slug) || null;
+  if (localPost) return localPost;
+
+  if (locale !== "en") {
+    const fallbackPost = await getCmsBlogPost("en", slug);
+    return fallbackPost ? withFallbackLocale(fallbackPost, locale) : null;
+  }
+
+  return null;
 }
 
-export async function getCmsBlogSlugs(locale: Locale) {
+export async function getCmsBlogSlugs(locale: Locale): Promise<string[]> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
     const mongoSlugs = drafts
@@ -293,11 +336,13 @@ export async function getCmsBlogSlugs(locale: Locale) {
       : await readCachedMongoBlogSlugs(locale);
     if (mongoSlugs.length) {
       const legacySlugs = legacyBlogPosts[locale].map((post) => post.slug);
-      return Array.from(new Set([...mongoSlugs, ...legacySlugs]));
+      const fallbackSlugs = locale === "en" ? [] : await getCmsBlogSlugs("en");
+      return Array.from(new Set([...mongoSlugs, ...legacySlugs, ...fallbackSlugs]));
     }
   }
 
   const cmsPosts = await getLocalCmsBlogPosts(locale);
   const legacySlugs = legacyBlogPosts[locale].map((post) => post.slug);
-  return Array.from(new Set([...cmsPosts.map((post) => post.slug), ...legacySlugs]));
+  const fallbackSlugs = locale === "en" ? [] : await getCmsBlogSlugs("en");
+  return Array.from(new Set([...cmsPosts.map((post) => post.slug), ...legacySlugs, ...fallbackSlugs]));
 }

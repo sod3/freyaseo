@@ -78,6 +78,21 @@ const jsonRecordSchema = z.object({
   jsonData: z.string().min(2),
 });
 
+const pageTranslationSchema = z.object({
+  sourcePageId: z.string().min(1),
+  locale: z.string().trim().transform(normalizeLanguageCode).refine(isValidLanguageCode),
+});
+
+class AdminInputError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "AdminInputError";
+    this.code = code;
+  }
+}
+
 function formBoolean(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
 }
@@ -102,6 +117,27 @@ function slugify(value: string, fallback = "draft") {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || fallback;
+}
+
+function basePathForTranslation(pathname: string) {
+  const clean = `/${String(pathname || "/").replace(/^\/+|\/+$/g, "")}/`;
+  const withoutLocale = clean.replace(/^\/[a-z]{2,3}(?:-[a-z0-9]{2,8})?\//i, "/");
+  return withoutLocale === "//" ? "/" : withoutLocale;
+}
+
+async function uniquePagePath(basePath: string, locale: string) {
+  const pages = await mongoCollection<Record<string, unknown>>("pages");
+  const normalizedBase = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  let candidate = normalizedBase;
+  let counter = 2;
+
+  while (await pages.findOne({ path: candidate })) {
+    const trimmed = normalizedBase.replace(/\/$/g, "");
+    candidate = `${trimmed}-${locale}${counter > 2 ? `-${counter}` : ""}/`;
+    counter += 1;
+  }
+
+  return candidate;
 }
 
 function cleanEditorHtml(value?: string) {
@@ -159,6 +195,40 @@ function parseTags(value?: string | null) {
   );
 }
 
+function normalizePublicPath(value: string, fallback = "/") {
+  const raw = String(value || fallback).trim();
+  let withoutOrigin = raw;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      withoutOrigin = new URL(raw).pathname;
+    } catch {
+      throw new AdminInputError("invalid-path", "Use a valid page address, such as /about/.");
+    }
+  }
+  const normalized = `/${withoutOrigin.replace(/^\/+|\/+$/g, "")}/`.replace(/\/{2,}/g, "/");
+  return normalized === "//" ? "/" : normalized;
+}
+
+function assertSafePublicPath(pathname: string) {
+  const firstSegment = pathname.split("/").filter(Boolean)[0]?.toLowerCase() || "";
+  const reserved = new Set(["admin", "api", "_next", "uploads", "wp-content", "wp-includes"]);
+  if (reserved.has(firstSegment)) {
+    throw new AdminInputError("reserved-path", "That page address is reserved by the website.");
+  }
+}
+
+async function assertUniquePagePath(pathname: string, currentId?: string) {
+  const pages = await mongoCollection<Record<string, unknown>>("pages");
+  const existing = await pages.findOne({ path: pathname, deletedAt: { $ne: true } }, { projection: { _id: 1 } });
+  if (existing && (!currentId || documentId(existing) !== currentId)) {
+    throw new AdminInputError("duplicate-path", "This page address is already being used.");
+  }
+}
+
+function adminErrorCode(error: unknown) {
+  return error instanceof AdminInputError ? error.code : "validation";
+}
+
 async function pathPrefixForLanguage(locale: string) {
   const settings = await getLanguageSettings();
   const language = settings.languages.find((item) => item.code === locale);
@@ -169,6 +239,13 @@ async function blogPathForLanguage(locale: string, slug: string) {
   if (locale === "el") return `/el/seo-blog/${slug}/`;
   const prefix = await pathPrefixForLanguage(locale);
   return prefix ? `${prefix}/blog/${slug}/` : `/blog/${slug}/`;
+}
+
+async function pagePathForLanguage(sourcePath: string, locale: string) {
+  const prefix = await pathPrefixForLanguage(locale);
+  const basePath = basePathForTranslation(sourcePath);
+  const translatedPath = prefix ? `${prefix}${basePath}`.replace(/\/{2,}/g, "/") : basePath;
+  return uniquePagePath(translatedPath, locale);
 }
 
 function escapeHtmlText(value: string) {
@@ -295,7 +372,15 @@ function revalidateCmsTags(...tags: string[]) {
 function cacheTagsForModule(module: AdminModuleSlug) {
   if (module === "redirects") return ["cms-redirects"];
   if (module === "blog") return ["cms-blog"];
-  if (module === "navigation" || module === "footer" || module === "seo" || module === "google-integrations" || module === "settings" || module === "forms") {
+  if (
+    module === "navigation" ||
+    module === "footer" ||
+    module === "languages" ||
+    module === "seo" ||
+    module === "google-integrations" ||
+    module === "settings" ||
+    module === "forms"
+  ) {
     return ["cms-settings", "cms-pages"];
   }
   return ["cms-pages", "cms-blog"];
@@ -425,7 +510,9 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
   const pages = await mongoCollection<Record<string, unknown>>("pages");
   const current = await pages.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Page not found.");
-  const nextPath = data.path || String(current.path || "");
+  const nextPath = normalizePublicPath(data.path || String(current.path || "/"));
+  assertSafePublicPath(nextPath);
+  await assertUniquePagePath(nextPath, documentId(current));
   const now = new Date();
   const locale = normalizeLanguageCode(data.language || String(current.locale || "en"));
   const previousSeoTitle = typeof (typeof current.seo === "object" && current.seo ? (current.seo as Record<string, unknown>).title : null) === "object"
@@ -509,7 +596,9 @@ async function createPageRecord(data: z.infer<typeof recordSchema>) {
   const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `page-${Date.now()}`);
   const prefix = await pathPrefixForLanguage(locale);
-  const path = data.path || (prefix ? `${prefix}/${slug}/` : `/${slug}/`);
+  const path = normalizePublicPath(data.path || (prefix ? `${prefix}/${slug}/` : `/${slug}/`));
+  assertSafePublicPath(path);
+  await assertUniquePagePath(path);
   const now = new Date();
   const result = await pages.insertOne({
     sourceSlug: slug,
@@ -691,12 +780,90 @@ export async function saveRecordAction(formData: FormData) {
     } else {
       await audit("content.update_skipped", data.module, data.id, data.title, { reason: "Module uses JSON editor." });
     }
-  } catch {
-    safeAdminRedirect(`/admin/${data.module}?error=validation`);
+  } catch (error) {
+    safeAdminRedirect(`/admin/${data.module}?error=${adminErrorCode(error)}`);
   }
 
   revalidatePath("/admin");
   safeAdminRedirect(`/admin/${data.module}?notice=saved`);
+}
+
+export async function createPageTranslationAction(targetLocale: string, formData: FormData) {
+  if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/pages?error=session");
+  const user = await requireAdminUser("content.write");
+  const parsed = pageTranslationSchema.safeParse({
+    sourcePageId: formData.get("sourcePageId"),
+    locale: targetLocale,
+  });
+  if (!parsed.success) safeAdminRedirect("/admin/pages?error=validation");
+
+  const languageSettings = await getLanguageSettings();
+  const targetLanguage = activeLanguages(languageSettings).find((language) => language.code === parsed.data.locale);
+  if (!targetLanguage) safeAdminRedirect("/admin/pages?error=validation");
+
+  const pages = await mongoCollection<Record<string, unknown>>("pages");
+  const source = await pages.findOne(await byId(parsed.data.sourcePageId));
+  if (!source) safeAdminRedirect("/admin/pages?error=not-found");
+
+  const locale = parsed.data.locale;
+  const existingTranslationKey = String(source.translationKey || source.translationGroup || "").trim();
+  const translationKey = existingTranslationKey || slugify(String(source.slug || source.sourceSlug || source.title || source.path || documentId(source)), documentId(source));
+  const existingTranslation = await pages.findOne({
+    locale,
+    deletedAt: { $ne: true },
+    $or: [{ translationKey }, { translationGroup: translationKey }],
+  });
+  if (existingTranslation) safeAdminRedirect(`/admin/pages?edit=${documentId(existingTranslation)}`);
+
+  const sourcePath = String(source.path || "/");
+  const translatedPath = await pagePathForLanguage(sourcePath, locale);
+  const now = new Date();
+  const title = String(source.title || "Translated page");
+  const seo = typeof source.seo === "object" && source.seo ? (source.seo as Record<string, unknown>) : {};
+  const { _id, id, createdAt, updatedAt, deletedAt, ...sourceCopy } = source;
+  void _id;
+  void id;
+  void createdAt;
+  void updatedAt;
+  void deletedAt;
+
+  if (!existingTranslationKey) {
+    await pages.updateOne(await byId(documentId(source)), {
+      $set: {
+        translationKey,
+        updatedAt: now,
+      },
+    });
+  }
+
+  const result = await pages.insertOne({
+    ...sourceCopy,
+    sourceSlug: `${translationKey}-${locale}`,
+    slug: slugify(translatedPath, `${translationKey}-${locale}`),
+    title,
+    description: String(source.description || ""),
+    path: translatedPath,
+    locale,
+    language: locale,
+    status: "draft",
+    alternatePath: sourcePath,
+    translationKey,
+    seo: {
+      ...seo,
+      canonicalUrl: translatedPath,
+    },
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await audit("content.translation_created", "page", result.insertedId.toHexString(), title, {
+    sourcePageId: documentId(source),
+    locale,
+    user: user.email,
+  });
+  revalidateCmsTags("cms-pages");
+  revalidatePath("/admin");
+  safeAdminRedirect(`/admin/pages?edit=${result.insertedId.toHexString()}&notice=translation-created`);
 }
 
 export async function saveJsonRecordAction(formData: FormData) {

@@ -124,8 +124,29 @@ function ensureServiceMenu(root: HTMLElement, locale: string) {
 }
 
 function languageOptionLabel(option: LanguageOption) {
-  const flag = option.flagEmoji ? `${option.flagEmoji} ` : "";
-  return `${flag}${option.shortLabel || option.label || option.code.toUpperCase()}`;
+  return option.shortLabel || option.label || option.code.toUpperCase();
+}
+
+function immediateLanguageOptions(locale: string, pagePath: string): LanguageOption[] {
+  const currentCode = builtInLocale(locale);
+  const alternateCode = currentCode === "el" ? "en" : "el";
+
+  return [
+    {
+      code: currentCode,
+      label: currentCode === "el" ? "Greek" : "English",
+      shortLabel: currentCode.toUpperCase(),
+      href: normalizePath(pagePath),
+      current: true,
+    },
+    {
+      code: alternateCode,
+      label: alternateCode === "el" ? "Greek" : "English",
+      shortLabel: alternateCode.toUpperCase(),
+      href: getAlternatePath(pagePath),
+      current: false,
+    },
+  ];
 }
 
 function ensureLanguageMenu(root: HTMLElement, languages: LanguageOption[]) {
@@ -135,7 +156,7 @@ function ensureLanguageMenu(root: HTMLElement, languages: LanguageOption[]) {
   const cleanups: Array<() => void> = [];
 
   navLists.forEach((navList) => {
-    navList.querySelectorAll(".lang-item").forEach((item) => item.remove());
+    navList.querySelectorAll(".pll-parent-menu-item, .lang-item").forEach((item) => item.remove());
     const current = languages.find((language) => language.current) || languages[0];
     const item = document.createElement("li");
     item.className = "menu-item menu-item-has-children elementskit-dropdown-has lang-item freya-language-menu";
@@ -158,7 +179,7 @@ function ensureLanguageMenu(root: HTMLElement, languages: LanguageOption[]) {
       link.href = language.href;
       link.hreflang = language.code;
       link.lang = language.code;
-      link.textContent = language.flagEmoji ? `${language.flagEmoji} ${language.label}` : language.label;
+      link.textContent = language.label;
       if (language.current) {
         link.setAttribute("aria-current", "page");
         link.classList.add("active");
@@ -215,6 +236,44 @@ function setActiveLinks(root: HTMLElement, pagePath: string) {
       link.closest("li")?.classList.add("current-menu-item", "current_page_item", "active");
     }
   });
+}
+
+function prefetchNavigationLinks(root: HTMLElement, router: { prefetch: (href: string) => void }) {
+  const hrefs = new Set<string>();
+
+  root.querySelectorAll<HTMLAnchorElement>(".site-header a[href], .elementskit-menu-container a[href]").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || link.target === "_blank") return;
+
+    try {
+      const url = new URL(href, window.location.origin);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      hrefs.add(`${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      return;
+    }
+  });
+
+  if (!hrefs.size) return () => {};
+
+  const prefetch = () => {
+    Array.from(hrefs)
+      .slice(0, 16)
+      .forEach((href) => router.prefetch(href));
+  };
+
+  const idleWindow = window as typeof window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+
+  if (idleWindow.requestIdleCallback) {
+    const idleId = idleWindow.requestIdleCallback(prefetch, { timeout: 1200 });
+    return () => idleWindow.cancelIdleCallback?.(idleId);
+  }
+
+  const timer = window.setTimeout(prefetch, 250);
+  return () => window.clearTimeout(timer);
 }
 
 function localizeCloneForm(form: HTMLFormElement, locale: string) {
@@ -486,6 +545,150 @@ function prepareCounterAnimations(root: HTMLElement) {
   };
 }
 
+type ElementorSettings = Record<string, unknown>;
+
+const elementorAnimationClasses = [
+  "bounceIn",
+  "bounceInDown",
+  "bounceInLeft",
+  "bounceInRight",
+  "bounceInUp",
+  "fadeIn",
+  "fadeInDown",
+  "fadeInLeft",
+  "fadeInRight",
+  "fadeInUp",
+  "slideInDown",
+  "slideInLeft",
+  "slideInRight",
+  "slideInUp",
+  "zoomIn",
+  "zoomInDown",
+  "zoomInLeft",
+  "zoomInRight",
+  "zoomInUp",
+];
+
+function readElementorSettings(element: Element): ElementorSettings {
+  const raw = element.getAttribute("data-settings");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw) as ElementorSettings;
+  } catch {
+    return {};
+  }
+}
+
+type ElementorSettingValue = string | number | boolean;
+
+function firstSettingValue(...values: unknown[]): ElementorSettingValue | undefined {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      const nested: ElementorSettingValue | undefined = firstSettingValue(...value);
+      if (nested !== undefined) return nested;
+      continue;
+    }
+    if (typeof value === "object") {
+      const nested: ElementorSettingValue | undefined = firstSettingValue(...Object.values(value));
+      if (nested !== undefined) return nested;
+      continue;
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  }
+  return undefined;
+}
+
+function normalizedAnimationName(value: unknown) {
+  const animation = String(firstSettingValue(value) ?? "").trim();
+  if (!animation || animation === "none") return "";
+  return /^[a-zA-Z0-9_-]+$/.test(animation) ? animation : "";
+}
+
+function cssTime(value: unknown, fallback: string) {
+  const setting = firstSettingValue(value);
+  if (typeof setting === "number" && Number.isFinite(setting)) return `${Math.max(0, setting)}ms`;
+  if (typeof setting !== "string") return fallback;
+
+  const normalized = setting.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (/^\d+(\.\d+)?m?s$/.test(normalized)) return normalized;
+  if (/^\d+(\.\d+)?$/.test(normalized)) return `${normalized}ms`;
+  if (normalized === "fast") return "600ms";
+  if (normalized === "slow") return "1200ms";
+  return fallback;
+}
+
+function revealElement(target: HTMLElement, animationName: string) {
+  target.dataset.freyaReveal = "visible";
+  target.classList.remove("elementor-invisible");
+  target.classList.add("animated", animationName);
+}
+
+function prepareRevealAnimations(root: HTMLElement) {
+  const targets = Array.from(root.querySelectorAll<HTMLElement>(".elementor-invisible, [data-settings]"));
+  const preparedTargets: HTMLElement[] = [];
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  targets.forEach((target) => {
+    if (target.dataset.freyaRevealPrepared === "true") return;
+
+    const settings = readElementorSettings(target);
+    const explicitAnimation = normalizedAnimationName(firstSettingValue(settings.animation, settings._animation));
+    const hasExplicitNone = firstSettingValue(settings.animation, settings._animation) === "none";
+    const animationName = explicitAnimation || (target.classList.contains("elementor-invisible") && !hasExplicitNone ? "fadeInUp" : "");
+
+    if (!animationName) {
+      if (target.classList.contains("elementor-invisible")) target.classList.remove("elementor-invisible");
+      return;
+    }
+
+    target.dataset.freyaRevealPrepared = "true";
+    target.dataset.freyaReveal = "ready";
+    target.dataset.freyaAnimation = animationName;
+    target.style.setProperty(
+      "--freya-reveal-delay",
+      cssTime(firstSettingValue(settings.animation_delay, settings._animation_delay), "0ms"),
+    );
+    target.style.setProperty(
+      "--freya-reveal-duration",
+      cssTime(firstSettingValue(settings.animation_duration, settings._animation_duration), "850ms"),
+    );
+    target.classList.remove("animated", ...elementorAnimationClasses);
+    preparedTargets.push(target);
+
+    if (reducedMotion) revealElement(target, animationName);
+  });
+
+  if (!preparedTargets.length || reducedMotion) return () => {};
+
+  if (!("IntersectionObserver" in window)) {
+    preparedTargets.forEach((target) => revealElement(target, target.dataset.freyaAnimation || "fadeInUp"));
+    return () => {};
+  }
+
+  const targetAnimations = new WeakMap<HTMLElement, string>();
+  preparedTargets.forEach((target) => {
+    targetAnimations.set(target, target.dataset.freyaAnimation || "fadeInUp");
+  });
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const target = entry.target as HTMLElement;
+        revealElement(target, targetAnimations.get(target) || "fadeInUp");
+        observer.unobserve(target);
+      });
+    },
+    { rootMargin: "0px 0px 12% 0px", threshold: 0.05 },
+  );
+
+  preparedTargets.forEach((target) => observer.observe(target));
+  return () => observer.disconnect();
+}
+
 function applyVisualRepairs(root: HTMLElement) {
   root.dataset.wpCloneEnhanced = "true";
 
@@ -517,24 +720,13 @@ function applyVisualRepairs(root: HTMLElement) {
     bar.style.setProperty("background", "linear-gradient(180deg, #d7f76b 0%, #3ee98f 48%, #1b8f5a 100%)", "important");
     bar.style.setProperty("animation", "none", "important");
   });
-
-  root.querySelectorAll<HTMLImageElement>(".site-logo img, .primary-logo img").forEach((logo) => {
-    const logoWidget = logo.closest<HTMLElement>(".elementor-widget-ks_site_logo, .site-logo-wrapper, .primary-logo, .elementor-element");
-    logoWidget?.style.setProperty("width", "clamp(112px, 11vw, 150px)", "important");
-    logoWidget?.style.setProperty("max-width", "clamp(112px, 11vw, 150px)", "important");
-    logoWidget?.style.setProperty("max-height", "none", "important");
-    logoWidget?.parentElement?.style.setProperty("width", "clamp(112px, 11vw, 150px)", "important");
-    logoWidget?.parentElement?.style.setProperty("max-height", "none", "important");
-    logo.style.setProperty("width", "clamp(112px, 11vw, 150px)", "important");
-    logo.style.setProperty("max-width", "clamp(112px, 11vw, 150px)", "important");
-    logo.style.setProperty("min-width", "112px", "important");
-    logo.style.setProperty("height", "auto", "important");
-    logo.style.setProperty("max-height", "none", "important");
-  });
 }
 
 async function loadLanguageOptions(pagePath: string) {
-  const response = await fetch(`/api/languages?path=${encodeURIComponent(pagePath)}`, {
+  const params = new URLSearchParams({ path: pagePath });
+  const query = window.location.search.replace(/^\?/, "");
+  if (query) params.set("query", query);
+  const response = await fetch(`/api/languages?${params.toString()}`, {
     headers: { accept: "application/json" },
   });
   if (!response.ok) return [];
@@ -556,6 +748,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
 
     roots.forEach((root) => {
       applyVisualRepairs(root);
+      cleanups.push(prepareRevealAnimations(root));
       cleanups.push(prepareCounterAnimations(root));
       ensureServiceMenu(root, locale);
 
@@ -565,11 +758,13 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
         if (link.target === "_blank") link.rel = "noopener noreferrer";
       });
 
-      root.querySelectorAll<HTMLAnchorElement>(".lang-item a[href], a[hreflang]").forEach((link) => {
+      root.querySelectorAll<HTMLAnchorElement>(".pll-parent-menu-item a[href], .pll-parent-menu-item a[hreflang]").forEach((link) => {
         link.setAttribute("href", getAlternatePath(pagePath));
       });
 
+      cleanups.push(ensureLanguageMenu(root, immediateLanguageOptions(locale, pagePath)));
       setActiveLinks(root, pagePath);
+      cleanups.push(prefetchNavigationLinks(root, router));
 
       const closeMenus = () => {
         root.querySelectorAll<HTMLElement>(".elementskit-menu-container.active").forEach((menu) => menu.classList.remove("active"));
