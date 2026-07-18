@@ -2501,3 +2501,14 @@ body.wp-clone-menu-open {
     font-size: 17px !important;
   }
 }
+/* Keep the performance graph visible even when the reveal observer is delayed. */
+.wp-clone-root.home .perf-chart-container .perf-bar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: scaleY(1) !important;
+  animation: none !important;
+}
+
+.wp-clone-root.home .perf-chart-container .perf-grid {
+  opacity: 1 !important;
+}
