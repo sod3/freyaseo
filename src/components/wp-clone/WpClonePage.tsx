@@ -22,6 +22,17 @@ type RuntimeWpClonePage = Omit<WpClonePageData, "locale"> & {
   };
 };
 
+const serviceDetailPaths = new Set([
+  "/ai-seo-2/",
+  "/automation/",
+  "/report/",
+  "/tool-generation/",
+  "/el/ai-seo-4/",
+  "/el/automation-2/",
+  "/el/report-2/",
+  "/el/tool-generation-2/",
+]);
+
 const greekAiSeoStats = `
 <div class="perf-stats">
   <div class="perf-stat"><h4>98<span>%</span></h4><p>ΠΟΣΟΣΤΟ ΕΠΙΤΥΧΙΑΣ</p></div>
@@ -40,10 +51,11 @@ function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
 
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
   const html = normalizeServiceSectionHtml(page);
+  const serviceDetailClass = serviceDetailPaths.has(page.path) ? " service-detail-page" : "";
 
   return (
     <div
-      className={`wp-clone-root ${page.bodyClass}`}
+      className={`wp-clone-root ${page.bodyClass}${serviceDetailClass}`}
       data-fallback-source-locale={page.translationFallback?.sourceLocale}
       data-fallback-source-path={page.translationFallback?.sourcePath}
       data-locale={page.locale}
