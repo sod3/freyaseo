@@ -2458,24 +2458,27 @@ body.wp-clone-menu-open {
 .wp-clone-root .freya-circle-cta {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 14px !important;
+  gap: 18px !important;
   width: auto !important;
   max-width: 100%;
   padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
   color: #f7faf8 !important;
   background: transparent !important;
+  box-shadow: none !important;
   text-decoration: none !important;
 }
 
 .wp-clone-root .freya-circle-cta-icon {
   display: inline-grid;
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
+  flex: 0 0 60px;
+  width: 60px;
+  height: 60px;
   place-items: center;
   border: 1px solid #55bd92;
   border-radius: 50%;
-  background: rgba(85, 189, 146, 0.08);
+  background: transparent;
   color: #55bd92;
   font-size: 23px;
   line-height: 1;
