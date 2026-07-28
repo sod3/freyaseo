@@ -64,8 +64,6 @@ function markServiceComparisonSection(html: string) {
 }
 
 function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
-  if (!serviceDetailPaths.has(page.path)) return page.html;
-
   let html = page.html;
   if (page.path === "/el/ai-seo-4/" && !html.includes('class="perf-stats"')) {
     const chartEnd = '<div class="perf-bar" style="height: 90%;"></div></div></div>';
@@ -77,7 +75,8 @@ function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
 
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
   const html = normalizeServiceSectionHtml(page);
-  const serviceDetailClass = serviceDetailPaths.has(page.path) ? " service-detail-page" : "";
+  const serviceDetailClass =
+    serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison") ? " service-detail-page" : "";
 
   return (
     <div
