@@ -2820,6 +2820,22 @@ body.wp-clone-menu-open {
   margin-inline: auto !important;
 }
 
+@media (min-width: 1025px) {
+  .wp-clone-root[data-page-path="/certificates/"] .freya-certificate-grid.freya-certificate-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  }
+
+  .wp-clone-root[data-page-path="/certificates/"] .freya-certificate-grid > .premium-cert-card {
+    grid-column: span 4;
+  }
+
+  .wp-clone-root[data-page-path="/certificates/"]
+    .freya-certificate-grid
+    > .premium-cert-card:nth-child(n + 4):nth-child(-n + 7) {
+    grid-column: span 3;
+  }
+}
+
 .wp-clone-root .freya-certificate-grid > .premium-cert-card {
   width: 100% !important;
   min-width: 0 !important;
