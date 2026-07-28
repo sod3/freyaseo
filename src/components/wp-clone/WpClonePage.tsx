@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { WpClonePageData } from "@/src/content/wp-clone/pages";
+import { ServiceEndingCTA } from "@/src/components/services/ServiceEndingCTA";
 import { BackToTopButton } from "./BackToTopButton";
 import { WpCloneBehavior } from "./WpCloneBehavior";
 
@@ -75,8 +76,8 @@ function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
 
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
   const html = normalizeServiceSectionHtml(page);
-  const serviceDetailClass =
-    serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison") ? " service-detail-page" : "";
+  const isServiceDetail = serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison");
+  const serviceDetailClass = isServiceDetail ? " service-detail-page" : "";
 
   return (
     <div
@@ -90,6 +91,7 @@ export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
       <div dangerouslySetInnerHTML={{ __html: html }} />
       <BackToTopButton locale={page.locale} />
       <WpCloneBehavior locale={page.locale} pagePath={page.path} />
+      {isServiceDetail ? <ServiceEndingCTA pagePath={page.path} /> : null}
     </div>
   );
 }

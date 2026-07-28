@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const pathname = normalizePath(url.searchParams.get("path") || "/");
   const query = url.searchParams.get("query") || "";
   const settings = await getLanguageSettings();
-  const languages = activeLanguages(settings);
+  const languages = activeLanguages(settings).filter((language) => language.code === "en" || language.code === "el");
   const blogPath = parseCmsBlogPath(pathname, settings);
 
   if (blogPath) {

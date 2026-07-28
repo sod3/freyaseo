@@ -34,11 +34,34 @@ const serviceLabels: Record<BuiltInLocale, Record<(typeof serviceRoutes)[number]
   },
   el: {
     aiSeo: "AI SEO",
-    automation: "Αυτοματισμοί",
-    reporting: "Αναφορές",
-    toolGeneration: "Δημιουργία Εργαλείων",
+    automation: "Automation",
+    reporting: "Report",
+    toolGeneration: "Tool Generation",
   },
 };
+
+const greekMainNavigation = new Map([
+  ["/el/seo-agency/", "Main Page"],
+  ["/el/seo-marketing-2/", "Services"],
+  ["/el/certificates-seo/", "SEO Certificates"],
+  ["/el/about-us/", "About"],
+  ["/el/seo-blog/", "Blog"],
+  ["/el/lets-contact/", "Contact"],
+]);
+
+const serviceLabelKeys = new Map<string, (typeof serviceRoutes)[number]["key"]>([
+  ["ai seo", "aiSeo"],
+  ["automation", "automation"],
+  ["automations", "automation"],
+  ["report", "reporting"],
+  ["reporting", "reporting"],
+  ["tool generation", "toolGeneration"],
+  ["\u03b1\u03c5\u03c4\u03bf\u03bc\u03b1\u03c4\u03b9\u03c3\u03bc\u03bf\u03af", "automation"],
+  ["\u03b1\u03c5\u03c4\u03bf\u03bc\u03b1\u03c4\u03b9\u03c3\u03bc\u03bf\u03c2", "automation"],
+  ["\u03b1\u03bd\u03b1\u03c6\u03bf\u03c1\u03ad\u03c2", "reporting"],
+  ["\u03b1\u03bd\u03b1\u03c6\u03bf\u03c1\u03ac", "reporting"],
+  ["\u03b4\u03b7\u03bc\u03b9\u03bf\u03c5\u03c1\u03b3\u03af\u03b1 \u03b5\u03c1\u03b3\u03b1\u03bb\u03b5\u03af\u03c9\u03bd", "toolGeneration"],
+]);
 
 const formCopy = {
   en: {
@@ -73,6 +96,324 @@ function localizedServiceMenu(locale: string): ServiceMenuItem[] {
     label: serviceLabels[contentLocale][service.key],
     href: service[contentLocale],
   }));
+}
+
+function normalizedLabel(value: string | null | undefined) {
+  return (value || "")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase();
+}
+
+function serviceKeyForLabel(value: string | null | undefined) {
+  return serviceLabelKeys.get(normalizedLabel(value));
+}
+
+function setNavigationLinkLabel(link: HTMLAnchorElement, label: string) {
+  const labelElement = link.querySelector<HTMLElement>(".elementskit-menu-title, .menu-link-text, .nav-link-text");
+  if (labelElement) {
+    labelElement.textContent = label;
+    return;
+  }
+
+  const textNode = Array.from(link.childNodes).find(
+    (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+  );
+  if (textNode) {
+    textNode.textContent = `${label} `;
+    return;
+  }
+
+  link.insertAdjacentText("afterbegin", `${label} `);
+}
+
+function ensureGreekMainNavigation(root: HTMLElement, locale: string) {
+  if (builtInLocale(locale) !== "el") return;
+
+  root.querySelectorAll<HTMLAnchorElement>(".site-header .elementskit-navbar-nav > li > a[href]").forEach((link) => {
+    const href = normalizeHref(link.getAttribute("href"), "el");
+    if (!href) return;
+    let pathname = "";
+    try {
+      pathname = normalizePath(new URL(href, window.location.origin).pathname);
+    } catch {
+      return;
+    }
+    const label = greekMainNavigation.get(pathname);
+    if (label) setNavigationLinkLabel(link, label);
+  });
+}
+
+function removeFrenchUi(root: HTMLElement) {
+  const uiRoots = root.querySelectorAll<HTMLElement>(
+    ".site-header, #site-footer, .elementskit-menu-container, .language-switcher, .pll-switcher-select",
+  );
+  uiRoots.forEach((uiRoot) => {
+    uiRoot
+      .querySelectorAll<HTMLElement>(
+        ".lang-item-fr, [hreflang='fr'], [hreflang^='fr-'], [lang='fr'], [lang^='fr-'], a[href*='/fr/'], a[href*='lang=fr']",
+      )
+      .forEach((item) => (item.closest("li") || item).remove());
+  });
+}
+
+function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string) {
+  if (normalizePath(pagePath) !== "/") return () => {};
+
+  const list = Array.from(root.querySelectorAll<HTMLElement>(".ekit-fancy-text-lists")).find((candidate) => {
+    if (candidate.closest("#site-footer")) return false;
+    const text = normalizedLabel(candidate.textContent);
+    return text.includes("google") && text.includes("ai");
+  });
+  if (!list || list.dataset.freyaRotatorPrepared === "true") return () => {};
+
+  const items = Array.from(list.querySelectorAll<HTMLElement>("b")).slice(0, 2);
+  if (items.length < 2) return () => {};
+
+  items[0].textContent = "#1 on Google";
+  items[1].textContent = "#1 on AI";
+  items.forEach((item, index) => {
+    item.classList.add("freya-hero-rotator-item");
+    item.classList.toggle("is-active", index === 0);
+    item.setAttribute("aria-hidden", String(index !== 0));
+  });
+  list.classList.add("freya-hero-rotator");
+  list.dataset.freyaRotatorPrepared = "true";
+  list.setAttribute("aria-live", "polite");
+  list.setAttribute("aria-atomic", "true");
+
+  let activeIndex = 0;
+  const timer = window.setInterval(() => {
+    activeIndex = (activeIndex + 1) % items.length;
+    items.forEach((item, index) => {
+      const active = index === activeIndex;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-hidden", String(!active));
+    });
+  }, 3200);
+
+  return () => window.clearInterval(timer);
+}
+
+function prepareSeeServicesCta(root: HTMLElement, locale: string, pagePath: string) {
+  const normalized = normalizePath(pagePath);
+  if (normalized !== "/" && normalized !== "/el/seo-agency/") return;
+
+  const href = builtInLocale(locale) === "el" ? "/el/seo-marketing-2/" : "/seo-marketing/";
+  root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
+    if (normalizedLabel(link.textContent) !== "see services") return;
+    link.setAttribute("href", href);
+    link.classList.add("freya-circle-cta");
+    if (!link.querySelector(".freya-circle-cta-icon")) {
+      const icon = document.createElement("span");
+      icon.className = "freya-circle-cta-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "\u2192";
+      link.appendChild(icon);
+    }
+  });
+}
+
+function prepareServiceCards(root: HTMLElement, locale: string) {
+  const contentLocale = builtInLocale(locale);
+  const candidates = Array.from(
+    root.querySelectorAll<HTMLElement>(
+      "a.fs-blog-card, a.service-card, .service-card, [class*='service-card'], .elementor-widget-icon-box",
+    ),
+  );
+  const grids = new Map<Element, Set<string>>();
+
+  candidates.forEach((candidate) => {
+    const heading = candidate.querySelector<HTMLElement>(
+      ".fs-post-title, .elementor-icon-box-title, .elementor-heading-title, h2, h3",
+    );
+    const key = serviceKeyForLabel(heading?.textContent);
+    if (!key) return;
+    const service = serviceRoutes.find((item) => item.key === key);
+    if (!service) return;
+    const href = service[contentLocale];
+
+    if (candidate instanceof HTMLAnchorElement) {
+      candidate.setAttribute("href", href);
+    } else {
+      const existing = candidate.querySelector<HTMLAnchorElement>("a[href]");
+      if (existing) {
+        existing.setAttribute("href", href);
+      } else {
+        const wrapper = candidate.querySelector<HTMLElement>(":scope > .elementor-icon-box-wrapper");
+        if (wrapper) {
+          const link = document.createElement("a");
+          link.className = "freya-service-card-link";
+          link.href = href;
+          link.setAttribute("aria-label", heading?.textContent?.trim() || serviceLabels[contentLocale][key]);
+          wrapper.parentElement?.insertBefore(link, wrapper);
+          link.appendChild(wrapper);
+        }
+      }
+    }
+
+    const grid = candidate.parentElement;
+    if (grid) {
+      const keys = grids.get(grid) || new Set<string>();
+      keys.add(key);
+      grids.set(grid, keys);
+    }
+  });
+
+  grids.forEach((keys, grid) => {
+    if (keys.size === serviceRoutes.length) grid.classList.add("freya-service-card-grid");
+  });
+}
+
+function prepareCertificateGrid(root: HTMLElement) {
+  const cards = Array.from(root.querySelectorAll<HTMLElement>(".premium-cert-card"));
+  if (cards.length < 2) return;
+
+  const firstContainer = cards[0].parentElement;
+  if (!firstContainer) return;
+  firstContainer.classList.add("freya-certificate-grid");
+
+  const sourceSections = Array.from(
+    new Set(cards.map((card) => card.closest<HTMLElement>(".e-con.e-parent")).filter(Boolean)),
+  ) as HTMLElement[];
+  cards.forEach((card) => firstContainer.appendChild(card));
+
+  sourceSections.slice(1).forEach((section) => {
+    if (!section.querySelector(".premium-cert-card")) section.remove();
+  });
+}
+
+function repairGreekHomepageLayout(root: HTMLElement, pagePath: string) {
+  if (normalizePath(pagePath) !== "/el/seo-agency/") return;
+
+  root
+    .querySelectorAll<HTMLElement>(
+      ".plans, .why-me-section, .scan-container, .custom-profile-card, .custom-profile-card .e-link-in-bio__content",
+    )
+    .forEach((element) => {
+      element.style.setProperty("height", "auto", "important");
+      element.style.setProperty("min-height", "0", "important");
+      element.style.setProperty("max-height", "none", "important");
+    });
+
+  root.querySelectorAll<HTMLElement>(".e-con, .e-con-inner, .elementor-widget").forEach((element) => {
+    const style = window.getComputedStyle(element);
+    (["marginTop", "marginRight", "marginBottom", "marginLeft"] as const).forEach((property) => {
+      if (Number.parseFloat(style[property]) < 0) {
+        element.style.setProperty(property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`), "0", "important");
+      }
+    });
+  });
+}
+
+type CategoryPost = {
+  href: string;
+  title: string;
+  excerpt: string;
+  meta: string;
+  image: HTMLImageElement | null;
+  readMore: string;
+};
+
+function categoryPostFromElement(item: HTMLElement): CategoryPost | null {
+  const titleLink = item.querySelector<HTMLAnchorElement>(".ultp-block-title a, h2 a, h3 a");
+  const href = titleLink?.getAttribute("href") || item.querySelector<HTMLAnchorElement>("a[href]")?.getAttribute("href") || "";
+  const title = titleLink?.textContent?.trim() || "";
+  if (!href || !title) return null;
+
+  const meta = Array.from(
+    item.querySelectorAll<HTMLElement>(".ultp-block-author, .ultp-block-date, .ultp-post-read"),
+  )
+    .map((element) => element.textContent?.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" \u00b7 ");
+
+  return {
+    href,
+    title,
+    excerpt: item.querySelector<HTMLElement>(".ultp-block-excerpt")?.textContent?.replace(/\s+/g, " ").trim() || "",
+    meta,
+    image: item.querySelector<HTMLImageElement>("img"),
+    readMore: item.querySelector<HTMLElement>(".ultp-block-readmore")?.textContent?.replace(/\s+/g, " ").trim() || "Read More",
+  };
+}
+
+function createCategoryArticle(post: CategoryPost, featured: boolean) {
+  const article = document.createElement("article");
+  article.className = featured ? "freya-category-featured" : "freya-category-card";
+
+  if (post.image) {
+    const imageLink = document.createElement("a");
+    imageLink.className = "freya-category-image";
+    imageLink.href = post.href;
+    const image = post.image.cloneNode(true) as HTMLImageElement;
+    image.removeAttribute("style");
+    imageLink.appendChild(image);
+    article.appendChild(imageLink);
+  }
+
+  const body = document.createElement("div");
+  body.className = "freya-category-card-body";
+  const heading = document.createElement(featured ? "h2" : "h3");
+  const headingLink = document.createElement("a");
+  headingLink.href = post.href;
+  headingLink.textContent = post.title;
+  heading.appendChild(headingLink);
+  body.appendChild(heading);
+
+  if (post.meta) {
+    const meta = document.createElement("p");
+    meta.className = "freya-category-meta";
+    meta.textContent = post.meta;
+    body.appendChild(meta);
+  }
+  if (post.excerpt) {
+    const excerpt = document.createElement("p");
+    excerpt.className = "freya-category-excerpt";
+    excerpt.textContent = post.excerpt;
+    body.appendChild(excerpt);
+  }
+
+  const readMore = document.createElement("a");
+  readMore.className = "freya-category-read-more";
+  readMore.href = post.href;
+  readMore.textContent = post.readMore;
+  body.appendChild(readMore);
+  article.appendChild(body);
+  return article;
+}
+
+function prepareEnglishCategoryBlog(root: HTMLElement, pagePath: string) {
+  const normalized = normalizePath(pagePath);
+  if (normalized !== "/seo-tips/" && normalized !== "/ai-seo/") return;
+  if (root.querySelector(".freya-category-blog")) return;
+
+  const sourceBlocks = Array.from(
+    root.querySelectorAll<HTMLElement>(".wp-block-ultimate-post-post-slider-1, .ultp-post-grid-block"),
+  );
+  if (!sourceBlocks.length) return;
+
+  const postsByHref = new Map<string, CategoryPost>();
+  sourceBlocks.forEach((block) => {
+    block.querySelectorAll<HTMLElement>(".ultp-block-item").forEach((item) => {
+      const post = categoryPostFromElement(item);
+      if (post && !postsByHref.has(post.href)) postsByHref.set(post.href, post);
+    });
+  });
+  const posts = Array.from(postsByHref.values());
+  if (posts.length < 2) return;
+
+  const section = document.createElement("section");
+  section.className = "freya-category-blog";
+  section.appendChild(createCategoryArticle(posts[0], true));
+
+  const grid = document.createElement("div");
+  grid.className = "freya-category-card-grid";
+  posts.slice(1).forEach((post) => grid.appendChild(createCategoryArticle(post, false)));
+  section.appendChild(grid);
+  sourceBlocks[0].parentElement?.insertBefore(section, sourceBlocks[0]);
+  sourceBlocks.forEach((block) => block.classList.add("freya-original-blog-layout"));
 }
 
 function normalizeHref(href: string | null, locale: string) {
@@ -731,7 +1072,9 @@ async function loadLanguageOptions(pagePath: string) {
   });
   if (!response.ok) return [];
   const payload = (await response.json()) as { languages?: LanguageOption[] };
-  return Array.isArray(payload.languages) ? payload.languages : [];
+  return Array.isArray(payload.languages)
+    ? payload.languages.filter((language) => language.code === "en" || language.code === "el")
+    : [];
 }
 
 export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath: string }) {
@@ -750,7 +1093,15 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
       applyVisualRepairs(root);
       cleanups.push(prepareRevealAnimations(root));
       cleanups.push(prepareCounterAnimations(root));
+      cleanups.push(prepareHomepageHeroRotation(root, pagePath));
       ensureServiceMenu(root, locale);
+      ensureGreekMainNavigation(root, locale);
+      removeFrenchUi(root);
+      prepareSeeServicesCta(root, locale, pagePath);
+      prepareServiceCards(root, locale);
+      prepareCertificateGrid(root);
+      repairGreekHomepageLayout(root, pagePath);
+      prepareEnglishCategoryBlog(root, pagePath);
 
       root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
         const href = normalizeHref(link.getAttribute("href"), locale);
