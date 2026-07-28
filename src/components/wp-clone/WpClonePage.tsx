@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { WpClonePageData } from "@/src/content/wp-clone/pages";
+import { wpClonePagesByPath, type WpClonePageData } from "@/src/content/wp-clone/pages";
 import { ServiceEndingCTA } from "@/src/components/services/ServiceEndingCTA";
 import { BackToTopButton } from "./BackToTopButton";
 import { WpCloneBehavior } from "./WpCloneBehavior";
@@ -34,12 +34,35 @@ const serviceDetailPaths = new Set([
   "/el/tool-generation-2/",
 ]);
 
+const serviceEndingSectionIds: Record<string, string> = {
+  "/ai-seo-2/": "da1df4a",
+  "/automation/": "3b48cd1",
+  "/report/": "406e2b2b",
+  "/tool-generation/": "2a83dc60",
+  "/el/ai-seo-4/": "485ed102",
+  "/el/automation-2/": "29702722",
+  "/el/report-2/": "69c8455a",
+  "/el/tool-generation-2/": "12d49d16",
+};
+
 const greekAiSeoStats = `
 <div class="perf-stats">
   <div class="perf-stat"><h4>98<span>%</span></h4><p>ΠΟΣΟΣΤΟ ΕΠΙΤΥΧΙΑΣ</p></div>
   <div class="perf-stat"><h4>2.5<span>x</span></h4><p>ΜΕΣΗ ΑΠΟΔΟΣΗ</p></div>
   <div class="perf-stat"><h4>10<span>k+</span></h4><p>ΛΕΞΕΙΣ-ΚΛΕΙΔΙΑ</p></div>
 </div>`;
+
+function extractFooter(html: string) {
+  const footerStart = html.indexOf("<footer");
+  const footerEnd = html.lastIndexOf("</footer>");
+  if (footerStart < 0 || footerEnd < footerStart) return "";
+  return html.slice(footerStart, footerEnd + "</footer>".length);
+}
+
+const serviceFooters: Record<string, string> = {
+  en: extractFooter(wpClonePagesByPath["/ai-seo-2/"].html),
+  el: extractFooter(wpClonePagesByPath["/el/seo-agency/"].html),
+};
 
 function markServiceComparisonSection(html: string) {
   const chartIndex = html.indexOf('class="perf-analytics-card"');
@@ -64,6 +87,30 @@ function markServiceComparisonSection(html: string) {
   return `${html.slice(0, sectionMatch.index)}${markedSection}${html.slice(sectionMatch.index + sectionMatch[0].length)}`;
 }
 
+function markServiceEndingSection(html: string, path: string) {
+  const sectionId = serviceEndingSectionIds[path];
+  if (!sectionId || html.includes("freya-service-ending-cta")) return html;
+
+  const sectionPattern = new RegExp(
+    `(<div class=")([^"]*\\belementor-element-${sectionId}\\b[^"]*)("(?=[^>]*\\bdata-id="${sectionId}"[^>]*>))`,
+  );
+
+  return html.replace(sectionPattern, (_match, opening, className, closing) => {
+    return `${opening}${className} freya-service-ending-cta${closing}`;
+  });
+}
+
+function ensureServiceFooter(html: string, locale: string) {
+  if (html.includes('id="site-footer"')) return html;
+
+  const footer = serviceFooters[locale] || serviceFooters.en;
+  if (!footer) return html;
+
+  const siteClose = html.lastIndexOf("</div>");
+  if (siteClose < 0) return `${html}${footer}`;
+  return `${html.slice(0, siteClose)}${footer}${html.slice(siteClose)}`;
+}
+
 function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
   let html = page.html;
   if (page.path === "/el/ai-seo-4/" && !html.includes('class="perf-stats"')) {
@@ -71,7 +118,14 @@ function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
     html = html.replace(chartEnd, `${chartEnd}${greekAiSeoStats}`);
   }
 
-  return markServiceComparisonSection(html);
+  html = markServiceComparisonSection(html);
+
+  if (serviceDetailPaths.has(page.path)) {
+    html = markServiceEndingSection(html, page.path);
+    html = ensureServiceFooter(html, page.locale);
+  }
+
+  return html;
 }
 
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {

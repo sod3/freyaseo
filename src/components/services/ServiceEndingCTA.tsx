@@ -8,10 +8,13 @@ export function ServiceEndingCTA({ pagePath }: { pagePath: string }) {
     if (!root) return;
 
     const footer = root.querySelector("#site-footer");
-    const headings = Array.from(root.querySelectorAll<HTMLHeadingElement>("h2")).filter(
-      (heading) => !footer?.contains(heading),
-    );
-    const section = headings.at(-1)?.closest<HTMLElement>(".e-con.e-parent");
+    const matchingHeading = Array.from(root.querySelectorAll<HTMLHeadingElement>("h2")).find((heading) => {
+      if (footer?.contains(heading)) return false;
+      return heading.textContent?.toLowerCase().includes("curious where you actually stand");
+    });
+    const section =
+      root.querySelector<HTMLElement>(".freya-service-ending-cta") ||
+      matchingHeading?.closest<HTMLElement>(".e-con.e-parent");
     if (!section) return;
 
     section.classList.add("freya-service-ending-cta");
@@ -19,10 +22,6 @@ export function ServiceEndingCTA({ pagePath }: { pagePath: string }) {
       element.classList.remove("elementor-invisible");
       element.dataset.freyaReveal = "visible";
     });
-
-    return () => {
-      section.classList.remove("freya-service-ending-cta");
-    };
   }, [pagePath]);
 
   return null;

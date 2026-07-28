@@ -81,3 +81,26 @@ test("renders article fallback instead of 404 for a missing translated blog slug
   assert.match(html, /What Is B2B SEO/i);
   assert.doesNotMatch(html, /This page could not be found/i);
 });
+
+test("service pages server-render the AI SEO ending and localized footer", async () => {
+  const servicePaths = [
+    "/ai-seo-2/",
+    "/automation/",
+    "/report/",
+    "/tool-generation/",
+    "/el/ai-seo-4/",
+    "/el/automation-2/",
+    "/el/report-2/",
+    "/el/tool-generation-2/",
+  ];
+
+  for (const path of servicePaths) {
+    const response = await render(path);
+    assert.equal(response.status, 200, path);
+
+    const html = await response.text();
+    assert.match(html, /freya-service-ending-cta/, path);
+    assert.match(html, /id="site-footer"/, path);
+    assert.equal((html.match(/id="site-footer"/g) || []).length, 1, path);
+  }
+});
