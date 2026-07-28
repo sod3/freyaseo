@@ -201,16 +201,24 @@ function prepareSeeServicesCta(root: HTMLElement, locale: string, pagePath: stri
   if (normalized !== "/" && normalized !== "/el/seo-agency/") return;
 
   const href = builtInLocale(locale) === "el" ? "/el/seo-marketing-2/" : "/seo-marketing/";
-  root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
-    if (normalizedLabel(link.textContent) !== "see services") return;
+  const links =
+    normalized === "/"
+      ? Array.from(root.querySelectorAll<HTMLAnchorElement>(".elementor-element-4a2a74c a.elementskit-btn"))
+      : Array.from(root.querySelectorAll<HTMLAnchorElement>(".elementor-element-c1bda6c a.elementskit-btn"));
+
+  links.forEach((link) => {
     link.setAttribute("href", href);
-    link.classList.add("freya-circle-cta");
-    if (!link.querySelector(".freya-circle-cta-icon")) {
-      const icon = document.createElement("span");
-      icon.className = "freya-circle-cta-icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "\u2192";
-      link.appendChild(icon);
+    link.classList.remove("freya-circle-cta");
+    link.classList.add("freya-primary-cta");
+    link.querySelector(".freya-circle-cta-icon")?.remove();
+
+    if (!link.querySelector(":scope > .button-wrapper")) {
+      const wrapper = document.createElement("span");
+      wrapper.className = "button-wrapper";
+      const label = document.createElement("span");
+      label.textContent = link.textContent?.replace(/\s+/g, " ").trim() || (normalized === "/" ? "See Services" : "Δείτε τις Υπηρεσίες");
+      wrapper.appendChild(label);
+      link.replaceChildren(wrapper);
     }
   });
 }

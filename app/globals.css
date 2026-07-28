@@ -1822,6 +1822,69 @@ body.wp-clone-menu-open {
   margin-top: 14px !important;
 }
 
+.wp-clone-root.home[data-page-path="/"] .elementor-element.elementor-element-4a2a74c .elementskit-btn {
+  border-radius: 30px !important;
+  background-image: linear-gradient(52deg, #52b788 25%, #74c69d 100%) !important;
+  transition: transform 0.2s cubic-bezier(0.455, 0.03, 0.515, 0.955) !important;
+}
+
+.wp-clone-root.home[data-page-path="/"] .elementor-element.elementor-element-4a2a74c .elementskit-btn:hover {
+  background-image: linear-gradient(80deg, #74c69d 10%, #52b788 100%) !important;
+}
+
+.wp-clone-root.home[data-page-path="/"] .elementor-element.elementor-element-4a2a74c .elementskit-btn::before {
+  border-radius: 30px !important;
+  transition: all 0.2s cubic-bezier(0.455, 0.03, 0.515, 0.955) !important;
+}
+
+.wp-clone-root .freya-primary-cta {
+  display: inline-flex !important;
+  width: auto !important;
+  min-height: 45px;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px 26px !important;
+  border: 0 !important;
+  border-radius: 30px !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(52deg, #52b788 25%, #74c69d 100%) !important;
+  color: #ffffff !important;
+  font-family: "Outfit", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  letter-spacing: 2px !important;
+  text-decoration: none !important;
+  text-transform: uppercase !important;
+  transition: transform 0.2s cubic-bezier(0.455, 0.03, 0.515, 0.955) !important;
+}
+
+.wp-clone-root .freya-primary-cta:hover,
+.wp-clone-root .freya-primary-cta:focus-visible {
+  background-image: linear-gradient(80deg, #74c69d 10%, #52b788 100%) !important;
+  color: #ffffff !important;
+}
+
+.wp-clone-root .freya-primary-cta::before {
+  border-radius: 30px !important;
+  transition: all 0.2s cubic-bezier(0.455, 0.03, 0.515, 0.955) !important;
+}
+
+.wp-clone-root[data-page-path="/el/seo-agency/"]
+  .elementor-element.elementor-element-c1bda6c
+  .elementskit-btn.freya-primary-cta {
+  background-image: linear-gradient(52deg, #52b788 25%, #74c69d 100%) !important;
+}
+
+.wp-clone-root[data-page-path="/el/seo-agency/"]
+  .elementor-element.elementor-element-c1bda6c
+  .elementskit-btn.freya-primary-cta:hover,
+.wp-clone-root[data-page-path="/el/seo-agency/"]
+  .elementor-element.elementor-element-c1bda6c
+  .elementskit-btn.freya-primary-cta:focus-visible {
+  background-image: linear-gradient(80deg, #74c69d 10%, #52b788 100%) !important;
+}
+
 /* Services */
 .wp-clone-root.home .e-con.e-parent:has(.glow-pill) {
   width: 100% !important;
@@ -2458,27 +2521,24 @@ body.wp-clone-menu-open {
 .wp-clone-root .freya-circle-cta {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 18px !important;
+  gap: 14px !important;
   width: auto !important;
   max-width: 100%;
   padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
   color: #f7faf8 !important;
   background: transparent !important;
-  box-shadow: none !important;
   text-decoration: none !important;
 }
 
 .wp-clone-root .freya-circle-cta-icon {
   display: inline-grid;
-  flex: 0 0 60px;
-  width: 60px;
-  height: 60px;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   border: 1px solid #55bd92;
   border-radius: 50%;
-  background: transparent;
+  background: rgba(85, 189, 146, 0.08);
   color: #55bd92;
   font-size: 23px;
   line-height: 1;
@@ -2881,6 +2941,27 @@ body.wp-clone-menu-open {
   text-overflow: clip !important;
 }
 
+.wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-c4ef273 {
+  align-items: flex-start !important;
+  gap: clamp(32px, 5vw, 72px) !important;
+}
+
+.wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9,
+.wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  gap: clamp(18px, 2vw, 28px) !important;
+  width: 100% !important;
+}
+
+.wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9 > *,
+.wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 > * {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
 @media (max-width: 1024px) {
   .wp-clone-root .freya-service-card-grid,
   .wp-clone-root[data-page-path="/seo-marketing/"] .fs-blog-grid,
@@ -2899,6 +2980,21 @@ body.wp-clone-menu-open {
     height: 360px !important;
     min-height: 360px;
     max-height: 360px;
+  }
+
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-c4ef273 {
+    flex-direction: column !important;
+  }
+
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-c4ef273 > *,
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9,
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 {
+    width: 100% !important;
+  }
+
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9,
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
@@ -2927,6 +3023,11 @@ body.wp-clone-menu-open {
   .wp-clone-root.service-detail-page .freya-service-ending-cta > .e-con-inner > .e-con > .e-con {
     padding: 32px 20px !important;
     border-radius: 22px !important;
+  }
+
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9,
+  .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 
