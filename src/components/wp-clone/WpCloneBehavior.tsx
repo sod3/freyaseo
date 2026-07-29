@@ -492,6 +492,7 @@ function ensureLanguageMenu(root: HTMLElement, languages: LanguageOption[]) {
     toggle.href = current.href || "/";
     toggle.setAttribute("aria-haspopup", "true");
     toggle.setAttribute("aria-expanded", "false");
+    toggle.dataset.languageCode = current.code.toLowerCase();
     toggle.textContent = languageOptionLabel(current);
 
     const submenu = document.createElement("ul");
@@ -1149,31 +1150,34 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
         root.querySelectorAll<HTMLElement>(".site-header.mobile-menu-active").forEach((header) => header.classList.remove("mobile-menu-active"));
         root.querySelectorAll<HTMLElement>(".elementskit-dropdown-open").forEach((submenu) => submenu.classList.remove("elementskit-dropdown-open"));
         root.querySelectorAll<HTMLElement>("[aria-expanded='true']").forEach((item) => item.setAttribute("aria-expanded", "false"));
+        root.querySelectorAll<HTMLButtonElement>(".elementskit-menu-hamburger.active").forEach((button) => {
+          button.classList.remove("active");
+          button.setAttribute("aria-label", locale === "el" ? "Άνοιγμα μενού πλοήγησης" : "Open navigation menu");
+        });
         document.body.classList.remove("wp-clone-menu-open");
       };
 
       const menuButtons = Array.from(root.querySelectorAll<HTMLButtonElement>(".elementskit-menu-hamburger, .elementskit-menu-toggler"));
       menuButtons.forEach((button) => {
         const isClose = button.classList.contains("elementskit-menu-close");
-        button.setAttribute(
-          "aria-label",
-          isClose
-            ? locale === "el"
-              ? "Κλείσιμο μενού πλοήγησης"
-              : "Close navigation menu"
-            : locale === "el"
-              ? "Άνοιγμα μενού πλοήγησης"
-              : "Open navigation menu",
-        );
+        const openLabel = locale === "el" ? "Άνοιγμα μενού πλοήγησης" : "Open navigation menu";
+        const closeLabel = locale === "el" ? "Κλείσιμο μενού πλοήγησης" : "Close navigation menu";
+        button.setAttribute("aria-label", isClose ? closeLabel : openLabel);
         button.setAttribute("aria-expanded", "false");
 
         const onClick = (event: MouseEvent) => {
           event.preventDefault();
+          if (isClose) {
+            closeMenus();
+            return;
+          }
           const nav = button.closest("nav");
           const menu = nav?.querySelector<HTMLElement>(".elementskit-menu-container");
           const isOpen = menu?.classList.toggle("active") ?? false;
           button.closest(".site-header")?.classList.toggle("mobile-menu-active", isOpen);
+          button.classList.toggle("active", isOpen);
           button.setAttribute("aria-expanded", String(isOpen));
+          button.setAttribute("aria-label", isOpen ? closeLabel : openLabel);
           document.body.classList.toggle("wp-clone-menu-open", isOpen);
         };
         button.addEventListener("click", onClick);
@@ -1185,6 +1189,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
         button.setAttribute("aria-haspopup", "true");
         button.setAttribute("aria-expanded", "false");
         const onClick = (event: MouseEvent) => {
+          if (button.classList.contains("freya-language-toggle")) return;
           if (!window.matchMedia("(max-width: 1024px)").matches) return;
           const submenu = button.parentElement?.querySelector<HTMLElement>(".elementskit-dropdown");
           if (!submenu) return;
@@ -1203,7 +1208,10 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
       cleanups.push(() => document.removeEventListener("keydown", onKeyDown));
 
       root.querySelectorAll<HTMLAnchorElement>(".elementskit-menu-container a[href]").forEach((link) => {
-        const onClick = () => closeMenus();
+        const onClick = () => {
+          if (link.classList.contains("ekit-menu-dropdown-toggle") && window.matchMedia("(max-width: 1024px)").matches) return;
+          closeMenus();
+        };
         link.addEventListener("click", onClick);
         cleanups.push(() => link.removeEventListener("click", onClick));
       });
