@@ -866,6 +866,32 @@ body.wp-clone-menu-open {
   background: rgba(9, 44, 31, 0.72);
 }
 
+.wp-clone-root .elementor-widget-html .fs-blog-card:hover,
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible {
+  border-color: #52b788 !important;
+  background: #52b788 !important;
+}
+
+.wp-clone-root .elementor-widget-html .fs-blog-card:hover .fs-post-title,
+.wp-clone-root .elementor-widget-html .fs-blog-card:hover .fs-post-meta,
+.wp-clone-root .elementor-widget-html .fs-blog-card:hover .fs-post-excerpt,
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible .fs-post-title,
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible .fs-post-meta,
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible .fs-post-excerpt {
+  color: #081c15 !important;
+}
+
+.wp-clone-root .elementor-widget-html .fs-blog-card:hover .fs-post-category,
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible .fs-post-category {
+  color: #52b788 !important;
+  background: #081c15 !important;
+}
+
+.wp-clone-root .elementor-widget-html .fs-blog-card:focus-visible {
+  outline: 2px solid #d8f3dc;
+  outline-offset: 4px;
+}
+
 .wp-clone-root .fs-blog-image-wrapper {
   position: relative;
   display: grid;
@@ -1750,7 +1776,8 @@ body.wp-clone-menu-open {
   --width: 100% !important;
 }
 
-.wp-clone-root.home .elementor-element-49b6611 {
+.wp-clone-root.home .elementor-element-49b6611,
+.wp-clone-root.home[data-page-path="/el/seo-agency/"] .e-con.e-parent:has(.perf-analytics-card) .scan-container {
   width: 100% !important;
   --width: 100% !important;
 }
@@ -2117,7 +2144,10 @@ body.wp-clone-menu-open {
   --width: 100% !important;
 }
 
-.wp-clone-root.home .elementor-element-d04e5db {
+.wp-clone-root.home .elementor-element-d04e5db,
+.wp-clone-root.home[data-page-path="/el/seo-agency/"]
+  .e-con.e-parent:has(.custom-profile-card):has(.custom-contact-form)
+  .e-con:has(> .e-con > .custom-profile-card):has(> .e-con > .custom-contact-form) {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   align-items: stretch !important;
@@ -2127,7 +2157,11 @@ body.wp-clone-menu-open {
   --width: 100% !important;
 }
 
-.wp-clone-root.home .elementor-element-d04e5db > .e-con {
+.wp-clone-root.home .elementor-element-d04e5db > .e-con,
+.wp-clone-root.home[data-page-path="/el/seo-agency/"]
+  .e-con.e-parent:has(.custom-profile-card):has(.custom-contact-form)
+  .e-con:has(> .e-con > .custom-profile-card):has(> .e-con > .custom-contact-form)
+  > .e-con {
   width: 100% !important;
   padding: 0 !important;
   --width: 100% !important;
@@ -2394,7 +2428,10 @@ body.wp-clone-menu-open {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
-  .wp-clone-root.home .elementor-element-d04e5db {
+  .wp-clone-root.home .elementor-element-d04e5db,
+  .wp-clone-root.home[data-page-path="/el/seo-agency/"]
+    .e-con.e-parent:has(.custom-profile-card):has(.custom-contact-form)
+    .e-con:has(> .e-con > .custom-profile-card):has(> .e-con > .custom-contact-form) {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 

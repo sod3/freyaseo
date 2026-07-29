@@ -292,29 +292,6 @@ function prepareCertificateGrid(root: HTMLElement) {
   });
 }
 
-function repairGreekHomepageLayout(root: HTMLElement, pagePath: string) {
-  if (normalizePath(pagePath) !== "/el/seo-agency/") return;
-
-  root
-    .querySelectorAll<HTMLElement>(
-      ".plans, .why-me-section, .scan-container, .custom-profile-card, .custom-profile-card .e-link-in-bio__content",
-    )
-    .forEach((element) => {
-      element.style.setProperty("height", "auto", "important");
-      element.style.setProperty("min-height", "0", "important");
-      element.style.setProperty("max-height", "none", "important");
-    });
-
-  root.querySelectorAll<HTMLElement>(".e-con, .e-con-inner, .elementor-widget").forEach((element) => {
-    const style = window.getComputedStyle(element);
-    (["marginTop", "marginRight", "marginBottom", "marginLeft"] as const).forEach((property) => {
-      if (Number.parseFloat(style[property]) < 0) {
-        element.style.setProperty(property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`), "0", "important");
-      }
-    });
-  });
-}
-
 type CategoryPost = {
   href: string;
   title: string;
@@ -1108,7 +1085,6 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
       prepareSeeServicesCta(root, locale, pagePath);
       prepareServiceCards(root, locale);
       prepareCertificateGrid(root);
-      repairGreekHomepageLayout(root, pagePath);
       prepareEnglishCategoryBlog(root, pagePath);
 
       root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
