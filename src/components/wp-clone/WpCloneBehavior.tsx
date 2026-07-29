@@ -1015,6 +1015,48 @@ function prepareRevealAnimations(root: HTMLElement) {
   return () => observer.disconnect();
 }
 
+function prepareGrowthGraphAnimations(root: HTMLElement) {
+  const lines = Array.from(root.querySelectorAll<SVGElement>(".growth-graph .graph-line"));
+  if (!lines.length) return () => {};
+
+  const reveal = (line: SVGElement) => line.classList.add("animate");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reducedMotion) {
+    lines.forEach((line) => {
+      line.style.strokeDashoffset = "0";
+      const dot = line.nextElementSibling;
+      if (dot instanceof SVGElement) dot.style.opacity = "1";
+    });
+    return () => {
+      lines.forEach((line) => {
+        line.style.removeProperty("stroke-dashoffset");
+        const dot = line.nextElementSibling;
+        if (dot instanceof SVGElement) dot.style.removeProperty("opacity");
+      });
+    };
+  }
+
+  if (!("IntersectionObserver" in window)) {
+    lines.forEach(reveal);
+    return () => {};
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        reveal(entry.target as SVGElement);
+        observer.unobserve(entry.target);
+      });
+    },
+    { rootMargin: "0px 0px 10% 0px", threshold: 0.1 },
+  );
+
+  lines.forEach((line) => observer.observe(line));
+  return () => observer.disconnect();
+}
+
 function applyVisualRepairs(root: HTMLElement) {
   root.dataset.wpCloneEnhanced = "true";
 
@@ -1077,6 +1119,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
     roots.forEach((root) => {
       applyVisualRepairs(root);
       cleanups.push(prepareRevealAnimations(root));
+      cleanups.push(prepareGrowthGraphAnimations(root));
       cleanups.push(prepareCounterAnimations(root));
       cleanups.push(prepareHomepageHeroRotation(root, pagePath));
       ensureServiceMenu(root, locale);
