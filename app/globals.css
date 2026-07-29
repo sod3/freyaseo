@@ -1468,16 +1468,27 @@ body.wp-clone-menu-open {
   .wp-clone-root .site-header .site-logo-wrapper,
   .wp-clone-root .site-header .site-logo,
   .wp-clone-root .site-header .primary-logo {
-    width: 38px !important;
-    min-width: 38px !important;
-    max-width: 38px !important;
+    width: 118px !important;
+    min-width: 118px !important;
+    max-width: 118px !important;
+    height: 32px !important;
+  }
+
+  .wp-clone-root .site-header .primary-logo {
+    position: relative;
+    overflow: visible;
   }
 
   .wp-clone-root .site-header .site-logo img,
   .wp-clone-root .site-header .primary-logo img {
-    width: 38px !important;
-    min-width: 38px !important;
-    max-width: 38px !important;
+    position: absolute !important;
+    top: 50%;
+    left: 0;
+    width: 118px !important;
+    min-width: 118px !important;
+    max-width: 118px !important;
+    height: auto !important;
+    transform: translateY(-50%);
   }
 
   .wp-clone-root .elementskit-menu-hamburger {
