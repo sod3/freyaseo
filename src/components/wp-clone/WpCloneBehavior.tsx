@@ -158,8 +158,9 @@ function removeFrenchUi(root: HTMLElement) {
   });
 }
 
-function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string) {
-  if (normalizePath(pagePath) !== "/") return () => {};
+function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string, locale: string) {
+  const normalized = normalizePath(pagePath);
+  if (normalized !== "/" && normalized !== "/el/seo-agency/") return () => {};
 
   const list = Array.from(root.querySelectorAll<HTMLElement>(".ekit-fancy-text-lists")).find((candidate) => {
     if (candidate.closest("#site-footer")) return false;
@@ -171,8 +172,9 @@ function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string) {
   const items = Array.from(list.querySelectorAll<HTMLElement>("b")).slice(0, 2);
   if (items.length < 2) return () => {};
 
-  items[0].textContent = "#1 on Google";
-  items[1].textContent = "#1 on AI";
+  const isGreek = builtInLocale(locale) === "el";
+  items[0].textContent = isGreek ? "στο Google" : "#1 on Google";
+  items[1].textContent = isGreek ? "στο AI" : "#1 on AI";
   items.forEach((item, index) => {
     item.classList.add("freya-hero-rotator-item");
     item.classList.toggle("is-active", index === 0);
@@ -1122,7 +1124,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
       cleanups.push(prepareRevealAnimations(root));
       cleanups.push(prepareGrowthGraphAnimations(root));
       cleanups.push(prepareCounterAnimations(root));
-      cleanups.push(prepareHomepageHeroRotation(root, pagePath));
+      cleanups.push(prepareHomepageHeroRotation(root, pagePath, locale));
       ensureServiceMenu(root, locale);
       ensureGreekMainNavigation(root, locale);
       removeFrenchUi(root);
