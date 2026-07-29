@@ -727,7 +727,12 @@ function safeEncode(value: string) {
   }
 }
 
+function normalizePercentEncoding(value: string) {
+  return value.replace(/%[0-9a-f]{2}/gi, (escape) => escape.toLowerCase());
+}
+
 export function getWpClonePageByPath(pathname: string) {
   const normalized = normalizeWpClonePath(pathname);
-  return wpClonePagesByPath[normalized] ?? wpClonePagesByPath[safeDecode(normalized)] ?? wpClonePagesByPath[safeEncode(normalized)];
+  const candidates = [normalized, safeDecode(normalized), safeEncode(normalized)].map(normalizePercentEncoding);
+  return candidates.map((candidate) => wpClonePagesByPath[candidate]).find(Boolean);
 }

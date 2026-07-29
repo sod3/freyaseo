@@ -3142,6 +3142,44 @@ body.wp-clone-menu-open {
   margin: 0 !important;
 }
 
+/* Preserve the WordPress single-article layout inside the generic Elementor shell. */
+.wp-clone-root.blog-single-layout-modern .modern-entry-image {
+  display: block !important;
+  width: 100% !important;
+  min-height: calc(50vh - var(--header-height)) !important;
+  padding: 0 !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+
+.wp-clone-root.blog-single-layout-modern .keystone-container.with-sidebar {
+  display: grid !important;
+  grid-template-columns: var(--grid-sidebar, 100%) !important;
+  gap: 50px !important;
+  width: 100% !important;
+  max-width: var(--container-max-width) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+  padding: var(--vertical-spacing) var(--column-spacing) !important;
+}
+
+.wp-clone-root.blog-single-layout-modern .keystone-container.with-sidebar > #primary,
+.wp-clone-root.blog-single-layout-modern .keystone-container.with-sidebar > #secondary {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+@media (min-width: 1240px) {
+  .wp-clone-root.blog-single-layout-modern .keystone-container.with-sidebar {
+    margin-top: calc((50vh - var(--header-height)) / -2) !important;
+    margin-bottom: 48px !important;
+    padding-top: calc(var(--vertical-spacing) * 0.75) !important;
+    padding-right: calc(var(--vertical-spacing) * 0.75) !important;
+    padding-bottom: var(--vertical-spacing) !important;
+    padding-left: calc(var(--vertical-spacing) * 0.75) !important;
+  }
+}
+
 @media (max-width: 1024px) {
   .wp-clone-root .freya-service-card-grid,
   .wp-clone-root[data-page-path="/seo-marketing/"] .fs-blog-grid,
@@ -3203,6 +3241,13 @@ body.wp-clone-menu-open {
   .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-275b6b9,
   .wp-clone-root[data-page-path="/el/seo-agency/"] .elementor-element-7bc27a7 {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 766.98px) {
+  .wp-clone-root.blog-single-layout-modern .keystone-container.with-sidebar {
+    padding-top: var(--mobile-spacing) !important;
+    padding-bottom: var(--mobile-spacing) !important;
   }
 }
 

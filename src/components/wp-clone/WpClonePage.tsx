@@ -128,8 +128,28 @@ function normalizeServiceSectionHtml(page: RuntimeWpClonePage) {
   return html;
 }
 
+function normalizeBlogArticleHtml(page: RuntimeWpClonePage, html: string) {
+  if (!page.bodyClass.includes("blog-single-layout-modern")) return html;
+
+  const featuredImage = html.match(
+    /<div class="entry-image"[^>]*>[\s\S]*?<img[^>]*\ssrc="([^"]+)"/i,
+  )?.[1];
+
+  if (!featuredImage) return html;
+
+  const fullSizeFeaturedImage = featuredImage.replace(
+    /-\d+x\d+(?=\.[a-z0-9]+(?:\?[^"]*)?$)/i,
+    "",
+  );
+  const safeFeaturedImage = fullSizeFeaturedImage.replace(/'/g, "%27");
+  return html.replace(
+    /<header class="page-header modern-entry-image" id="page-header">/i,
+    `<header class="page-header modern-entry-image" id="page-header" style="background-image:url('${safeFeaturedImage}')">`,
+  );
+}
+
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
-  const html = normalizeServiceSectionHtml(page);
+  const html = normalizeBlogArticleHtml(page, normalizeServiceSectionHtml(page));
   const isServiceDetail = serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison");
   const serviceDetailClass = isServiceDetail ? " service-detail-page" : "";
 
