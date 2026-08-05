@@ -158,42 +158,67 @@ function removeFrenchUi(root: HTMLElement) {
   });
 }
 
-function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string) {
-  if (normalizePath(pagePath) !== "/") return () => {};
+function prepareHomepageHeroRotation(root: HTMLElement, pagePath: string, locale: string) {
+  const normalized = normalizePath(pagePath);
+  if (normalized !== "/" && normalized !== "/el/seo-agency/") return () => {};
 
-  const list = Array.from(root.querySelectorAll<HTMLElement>(".ekit-fancy-text-lists")).find((candidate) => {
-    if (candidate.closest("#site-footer")) return false;
-    const text = normalizedLabel(candidate.textContent);
-    return text.includes("google") && text.includes("ai");
-  });
+  const list =
+    root.querySelector<HTMLElement>('[data-freya-hero-rotator="true"]') ||
+    Array.from(root.querySelectorAll<HTMLElement>(".ekit-fancy-text-lists")).find((candidate) => {
+      if (candidate.closest("#site-footer")) return false;
+      const text = normalizedLabel(candidate.textContent);
+      return text.includes("google") && text.includes("ai");
+    });
   if (!list || list.dataset.freyaRotatorPrepared === "true") return () => {};
 
   const items = Array.from(list.querySelectorAll<HTMLElement>("b")).slice(0, 2);
   if (items.length < 2) return () => {};
 
-  items[0].textContent = "#1 on Google";
-  items[1].textContent = "#1 on AI";
-  items.forEach((item, index) => {
-    item.classList.add("freya-hero-rotator-item");
-    item.classList.toggle("is-active", index === 0);
-    item.setAttribute("aria-hidden", String(index !== 0));
-  });
-  list.classList.add("freya-hero-rotator");
-  list.dataset.freyaRotatorPrepared = "true";
-  list.setAttribute("aria-live", "polite");
-  list.setAttribute("aria-atomic", "true");
-
-  let activeIndex = 0;
-  const timer = window.setInterval(() => {
-    activeIndex = (activeIndex + 1) % items.length;
+  const isGreek = builtInLocale(locale) === "el";
+  items[0].textContent = isGreek ? "στο Google" : "#1 on Google";
+  items[1].textContent = isGreek ? "στο AI" : "#1 on AI";
+  const activate = (activeIndex: number) => {
     items.forEach((item, index) => {
       const active = index === activeIndex;
       item.classList.toggle("is-active", active);
       item.setAttribute("aria-hidden", String(!active));
     });
-  }, 3200);
+  };
+  items.forEach((item) => {
+    item.classList.add("freya-hero-rotator-item");
+    item.classList.remove("is-visible", "is-hidden");
+  });
+  list.classList.add("freya-hero-rotator");
+  list.dataset.freyaRotatorPrepared = "true";
+  list.dataset.freyaHeroRotator = "true";
+  list.setAttribute("aria-live", "polite");
+  list.setAttribute("aria-atomic", "true");
+  activate(0);
 
-  return () => window.clearInterval(timer);
+  let activeIndex = 0;
+  let timer: number | undefined;
+  const schedule = () => {
+    timer = window.setTimeout(() => {
+      if (!document.hidden) {
+        activeIndex = (activeIndex + 1) % items.length;
+        activate(activeIndex);
+      }
+      schedule();
+    }, 3200);
+  };
+  const handleVisibilityChange = () => {
+    if (document.hidden) return;
+    if (timer !== undefined) window.clearTimeout(timer);
+    schedule();
+  };
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  schedule();
+
+  return () => {
+    if (timer !== undefined) window.clearTimeout(timer);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    delete list.dataset.freyaRotatorPrepared;
+  };
 }
 
 function prepareSeeServicesCta(root: HTMLElement, locale: string, pagePath: string) {
@@ -1121,7 +1146,7 @@ export function WpCloneBehavior({ locale, pagePath }: { locale: string; pagePath
       cleanups.push(prepareRevealAnimations(root));
       cleanups.push(prepareGrowthGraphAnimations(root));
       cleanups.push(prepareCounterAnimations(root));
-      cleanups.push(prepareHomepageHeroRotation(root, pagePath));
+      cleanups.push(prepareHomepageHeroRotation(root, pagePath, locale));
       ensureServiceMenu(root, locale);
       ensureGreekMainNavigation(root, locale);
       removeFrenchUi(root);

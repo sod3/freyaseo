@@ -36,7 +36,23 @@ test("server-renders the Freya SEO homepage", async () => {
   assert.match(html, /Freya SEO/);
   assert.match(html, /wp-clone-root/);
   assert.match(html, /data-page-path="\/"/);
+  assert.match(html, /data-freya-hero-rotator="true"/);
+  assert.match(html, /#1 on Google/);
+  assert.match(html, /#1 on AI/);
+  assert.doesNotMatch(html, /1# on (?:Google|AI)/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
+});
+
+test("server-renders the rotating Greek homepage headline without JavaScript", async () => {
+  const response = await render("/el/seo-agency/");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /data-page-path="\/el\/seo-agency\/"/);
+  assert.match(html, /data-freya-hero-rotator="true"/);
+  assert.match(html, /Μπορείτε να είστε #1/);
+  assert.match(html, />στο Google<\/b>/);
+  assert.match(html, />στο AI<\/b>/);
 });
 
 test("keeps admin pages private", async () => {

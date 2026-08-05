@@ -45,6 +45,13 @@ const serviceEndingSectionIds: Record<string, string> = {
   "/el/tool-generation-2/": "12d49d16",
 };
 
+const homepagePaths = new Set(["/", "/el/seo-agency/"]);
+
+const homepageHeroCopy = {
+  en: ["#1 on Google", "#1 on AI"],
+  el: ["στο Google", "στο AI"],
+} as const;
+
 const greekAiSeoStats = `
 <div class="perf-stats">
   <div class="perf-stat"><h4>98<span>%</span></h4><p>ΠΟΣΟΣΤΟ ΕΠΙΤΥΧΙΑΣ</p></div>
@@ -148,8 +155,54 @@ function normalizeBlogArticleHtml(page: RuntimeWpClonePage, html: string) {
   );
 }
 
+function normalizeHomepageHeroHtml(page: RuntimeWpClonePage, html: string) {
+  if (!homepagePaths.has(page.path)) return html;
+
+  const footerIndex = html.indexOf("<footer");
+  const pageContent = footerIndex >= 0 ? html.slice(0, footerIndex) : html;
+  const heroListPattern =
+    /<span class="([^"]*\bekit-fancy-text-lists\b[^"]*)"([^>]*)>\s*(<b class="[^"]*"[^>]*>[\s\S]*?<\/b>)\s*(<b class="[^"]*"[^>]*>[\s\S]*?<\/b>)\s*<\/span>/i;
+  const match = heroListPattern.exec(pageContent);
+  if (!match) return html;
+
+  const locale = page.locale === "el" ? "el" : "en";
+  const copy = homepageHeroCopy[locale];
+  const normalizeItem = (itemHtml: string, index: number) => {
+    return itemHtml.replace(
+      /<b class="([^"]*)"([^>]*)>[\s\S]*<\/b>/i,
+      (_item, className: string, attributes: string) => {
+        const classes = className
+          .split(/\s+/)
+          .filter(Boolean)
+          .filter((name) => !["is-visible", "is-hidden", "is-active", "freya-hero-rotator-item"].includes(name));
+        classes.push("freya-hero-rotator-item");
+        if (index === 0) classes.push("is-active");
+
+        const cleanAttributes = attributes.replace(/\saria-hidden=(?:"[^"]*"|'[^']*')/gi, "");
+        return `<b class="${classes.join(" ")}"${cleanAttributes} aria-hidden="${index !== 0}">${copy[index]}</b>`;
+      },
+    );
+  };
+
+  const listClasses = match[1]
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((name) => name !== "freya-hero-rotator");
+  listClasses.push("freya-hero-rotator");
+  const listAttributes = match[2].replace(
+    /\s(?:data-freya-hero-rotator|data-freya-rotator-prepared|aria-live|aria-atomic)=(?:"[^"]*"|'[^']*')/gi,
+    "",
+  );
+  const normalizedList = `<span class="${listClasses.join(" ")}"${listAttributes} data-freya-hero-rotator="true" aria-live="polite" aria-atomic="true">
+${normalizeItem(match[3], 0)}
+${normalizeItem(match[4], 1)}
+</span>`;
+
+  return `${html.slice(0, match.index)}${normalizedList}${html.slice(match.index + match[0].length)}`;
+}
+
 export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
-  const html = normalizeBlogArticleHtml(page, normalizeServiceSectionHtml(page));
+  const html = normalizeHomepageHeroHtml(page, normalizeBlogArticleHtml(page, normalizeServiceSectionHtml(page)));
   const isServiceDetail = serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison");
   const serviceDetailClass = isServiceDetail ? " service-detail-page" : "";
 
