@@ -3,19 +3,80 @@ import Script from "next/script";
 import { readSingleton } from "@/src/lib/cms/reader";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://www.freyaseo.com"),
-  title: {
-    default: "Rank First on Google & AI | Multilingual SEO Agency - FreyaSEO",
-    template: "%s",
-  },
-  description:
-    "Freya SEO is an SEO agency specializing in SEO for AI search and multilingual SEO, helping businesses rank higher and grow in global markets.",
-  icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-  },
+type SiteSettings = {
+  defaultTitle?: string;
+  description?: string;
+  primaryDomain?: string;
+  favicon?: string | null;
+  appleTouchIcon?: string | null;
+  defaultSocialImage?: string | null;
 };
+
+type SeoSettings = {
+  defaults?: {
+    title?: { en?: string };
+    description?: { en?: string };
+    robotsIndex?: boolean;
+    robotsFollow?: boolean;
+    openGraphTitle?: { en?: string };
+    openGraphDescription?: { en?: string };
+    openGraphImage?: string | null;
+    twitterTitle?: { en?: string };
+    twitterDescription?: { en?: string };
+    twitterImage?: string | null;
+    twitterCardType?: "summary" | "summary_large_image";
+  };
+};
+
+function safeMetadataBase(value?: string) {
+  try {
+    return new URL(value || "https://www.freyaseo.com");
+  } catch {
+    return new URL("https://www.freyaseo.com");
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [site, seo] = await Promise.all([
+    readSingleton<SiteSettings>("siteSettings"),
+    readSingleton<SeoSettings>("seoSettings"),
+  ]);
+  const defaults = seo?.defaults;
+  const title = site?.defaultTitle || defaults?.title?.en || "Rank First on Google & AI | Multilingual SEO Agency - FreyaSEO";
+  const description =
+    site?.description ||
+    defaults?.description?.en ||
+    "Freya SEO is an SEO agency specializing in SEO for AI search and multilingual SEO, helping businesses rank higher and grow in global markets.";
+  const socialImage = defaults?.openGraphImage || site?.defaultSocialImage || "/og.png";
+  const favicon = site?.favicon || "/favicon.png";
+
+  return {
+    metadataBase: safeMetadataBase(site?.primaryDomain),
+    title: { default: title, template: "%s" },
+    description,
+    icons: {
+      icon: favicon,
+      shortcut: favicon,
+      apple: site?.appleTouchIcon || undefined,
+    },
+    robots: {
+      index: defaults?.robotsIndex !== false,
+      follow: defaults?.robotsFollow !== false,
+    },
+    openGraph: {
+      title: defaults?.openGraphTitle?.en || title,
+      description: defaults?.openGraphDescription?.en || description,
+      images: [socialImage],
+      type: "website",
+    },
+    twitter: {
+      card: defaults?.twitterCardType || "summary_large_image",
+      title: defaults?.twitterTitle?.en || title,
+      description: defaults?.twitterDescription?.en || description,
+      images: [defaults?.twitterImage || socialImage],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

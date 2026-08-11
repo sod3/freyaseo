@@ -17,6 +17,16 @@ const collectionNames: Record<string, string> = {
   pages: "pages",
   redirects: "redirects",
   blogPosts: "blogPosts",
+  services: "services",
+  tools: "tools",
+  certificates: "certificates",
+  faqs: "faqs",
+  testimonials: "testimonials",
+  mediaAssets: "mediaAssets",
+  tags: "tags",
+  categories: "categories",
+  authors: "authors",
+  forms: "forms",
 };
 
 function shouldReadMongo() {
@@ -45,8 +55,14 @@ async function readMongoCollection<T>(name: string): Promise<Array<{ slug: strin
 
   const collection = await mongoCollection<Record<string, unknown>>(collectionName);
   const records = await collection
-    .find({})
-    .sort(name === "pages" ? { navigationOrder: 1, path: 1 } : { updatedAt: -1 })
+    .find({ deletedAt: null, status: { $ne: "soft_deleted" } })
+    .sort(
+      name === "pages"
+        ? { navigationOrder: 1, path: 1 }
+        : name === "blogPosts"
+          ? { publishedDate: -1, updatedAt: -1 }
+          : { displayOrder: 1, updatedAt: -1 },
+    )
     .toArray();
 
   return records.map((record) => ({
@@ -64,8 +80,7 @@ export const readSingleton = cache(async <T>(name: string): Promise<T | null> =>
 export const readCollection = cache(async <T>(name: string): Promise<Array<{ slug: string; entry: T }>> => {
   const fallback = await readLocalCollection<T>(name);
   if (!shouldReadMongo()) return fallback;
-  return withMongo(async () => {
-    const entries = await readMongoCollection<T>(name);
-    return entries.length ? entries : fallback;
-  }, fallback);
+  // An empty MongoDB collection is meaningful (for example, after deleting
+  // the last item) and must not resurrect bundled seed content.
+  return withMongo(() => readMongoCollection<T>(name), fallback);
 });

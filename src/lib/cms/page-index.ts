@@ -2,7 +2,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { documentId, isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
+import { documentId, isMongoConfigured, mongoCollection, tryMongo } from "@/src/lib/mongo";
 import type { CmsRoutablePage } from "./routing";
 
 export type CmsPageRouteEntry = CmsRoutablePage & {
@@ -90,11 +90,10 @@ export async function readLocalCmsPageBySourceSlug<T>(sourceSlug: string): Promi
 const readCachedMongoPageRouteIndex = unstable_cache(
   async () => {
     if (!isMongoConfigured()) return [];
-    return withMongo(async () => {
-      const pages = await mongoCollection<Record<string, unknown>>("pages");
-      const records = await pages
-        .find(
-          { deletedAt: { $ne: true }, status: { $ne: "soft_deleted" } },
+    const pages = await mongoCollection<Record<string, unknown>>("pages");
+    const records = await pages
+      .find(
+          { deletedAt: null, status: { $ne: "soft_deleted" } },
           {
             projection: {
               sourceSlug: 1,
@@ -110,12 +109,12 @@ const readCachedMongoPageRouteIndex = unstable_cache(
             },
           },
         )
-        .sort({ locale: 1, path: 1 })
-        .toArray();
+      .sort({ locale: 1, path: 1 })
+      .toArray();
 
-      return records
-        .filter((record) => record.path)
-        .map((record) => ({
+    return records
+      .filter((record) => record.path)
+      .map((record) => ({
           sourceSlug: String(record.sourceSlug || record.slug || documentId(record)),
           slug: String(record.slug || record.sourceSlug || documentId(record)),
           path: String(record.path || "/"),
@@ -126,17 +125,27 @@ const readCachedMongoPageRouteIndex = unstable_cache(
           alternatePath: typeof record.alternatePath === "string" ? record.alternatePath : undefined,
           status: typeof record.status === "string" ? record.status : "published",
           deletedAt: record.deletedAt,
-        })) satisfies CmsPageRouteEntry[];
-    }, []);
+      })) satisfies CmsPageRouteEntry[];
   },
   ["cms-page-route-index"],
   { tags: ["cms-pages"] },
 );
 
-export const getCmsPageRouteIndex = cache(async (): Promise<CmsPageRouteEntry[]> => {
-  const fallback = await readLocalPageRouteIndex();
-  if (!shouldReadMongo()) return fallback;
+export type CmsPageRouteIndexResult = {
+  entries: CmsPageRouteEntry[];
+  source: "mongo" | "local";
+};
 
-  const mongoEntries = await readCachedMongoPageRouteIndex();
-  return mongoEntries.length ? mongoEntries : fallback;
+export const getCmsPageRouteIndexResult = cache(async (): Promise<CmsPageRouteIndexResult> => {
+  const fallback = await readLocalPageRouteIndex();
+  if (!shouldReadMongo() || !isMongoConfigured()) return { entries: fallback, source: "local" };
+
+  const result = await tryMongo(() => readCachedMongoPageRouteIndex());
+  return result.ok
+    ? { entries: result.value, source: "mongo" }
+    : { entries: fallback, source: "local" };
+});
+
+export const getCmsPageRouteIndex = cache(async (): Promise<CmsPageRouteEntry[]> => {
+  return (await getCmsPageRouteIndexResult()).entries;
 });

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
@@ -366,7 +366,7 @@ async function byId(id: string): Promise<Filter<Document>> {
 }
 
 function revalidateCmsTags(...tags: string[]) {
-  Array.from(new Set(tags)).forEach((tag) => revalidateTag(tag, "max"));
+  Array.from(new Set(tags)).forEach((tag) => updateTag(tag));
 }
 
 function cacheTagsForModule(module: AdminModuleSlug) {
@@ -383,7 +383,21 @@ function cacheTagsForModule(module: AdminModuleSlug) {
   ) {
     return ["cms-settings", "cms-pages"];
   }
-  return ["cms-pages", "cms-blog"];
+  return ["cms-pages", "cms-blog", "cms-content"];
+}
+
+async function revalidatePublicModulePaths(module: AdminModuleSlug, record?: Record<string, unknown> | null) {
+  const paths = new Set(revalidationPathsForModule(module));
+  if (module === "pages" && record?.path) paths.add(String(record.path));
+  if (module === "blog" && record?.slug) {
+    const locale = normalizeLanguageCode(String(record.language || record.locale || "en"));
+    paths.add(await blogPathForLanguage(locale, String(record.slug)));
+  }
+  for (const path of paths) revalidatePath(path);
+
+  if (["navigation", "footer", "languages", "seo", "google-integrations", "settings"].includes(module)) {
+    revalidatePath("/", "layout");
+  }
 }
 
 async function audit(action: string, entityType: string, entityId?: string | null, entityName?: string | null, details?: unknown) {
@@ -588,7 +602,7 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
     createdAt: now,
   });
 
-  return { id: documentId(current), title: data.title, path: nextPath };
+  return { id: documentId(current), title: data.title, path: nextPath, previousPath: String(current.path || nextPath) };
 }
 
 async function createPageRecord(data: z.infer<typeof recordSchema>) {
@@ -644,8 +658,9 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
   const current = await posts.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Blog post not found.");
   const locale = normalizeLanguageCode(data.language || String(current.language || current.locale || "en"));
-  const slug = data.slug || String(current.slug || "");
+  const slug = slugify(data.slug || String(current.slug || data.title), String(current.slug || `post-${Date.now()}`));
   const now = new Date();
+  const status = cmsStatus(data.status);
   const canonical = data.canonicalUrl || (await blogPathForLanguage(locale, slug));
   const bodyHtml = cleanEditorHtml(data.bodyHtml ?? String(current.bodyHtml || current.bodyMarkdown || ""));
   const previousSeoTitle = typeof (typeof current.seo === "object" && current.seo ? (current.seo as Record<string, unknown>).title : null) === "object"
@@ -662,8 +677,8 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
       bodyHtml,
       bodyMarkdown: "",
       legacySections: [],
-      status: cmsStatus(data.status),
-      draft: cmsStatus(data.status) !== "published",
+      status,
+      draft: status !== "published",
       language: locale,
       locale,
       slug,
@@ -677,6 +692,8 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
         description: { ...previousSeoDescription, [locale]: data.seoDescription || data.description || "" },
         canonicalUrl: canonical,
       },
+      publishedDate: status === "published" ? current.publishedDate || now : current.publishedDate || null,
+      deletedAt: null,
       updatedAt: now,
     },
   });
@@ -687,7 +704,14 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
     newValue: { title: data.title, excerpt: data.description || "", status: cmsStatus(data.status), slug },
     createdAt: now,
   });
-  return { id: documentId(current), title: data.title, slug, locale };
+  return {
+    id: documentId(current),
+    title: data.title,
+    slug,
+    locale,
+    previousSlug: String(current.slug || slug),
+    previousLocale: normalizeLanguageCode(String(current.language || current.locale || locale)),
+  };
 }
 
 async function createBlogRecord(data: z.infer<typeof recordSchema>) {
@@ -695,6 +719,7 @@ async function createBlogRecord(data: z.infer<typeof recordSchema>) {
   const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `post-${Date.now()}`);
   const now = new Date();
+  const status = cmsStatus(data.status || "draft");
   const canonical = data.canonicalUrl || (await blogPathForLanguage(locale, slug));
   const result = await posts.insertOne({
     slug,
@@ -705,9 +730,9 @@ async function createBlogRecord(data: z.infer<typeof recordSchema>) {
     bodyHtml: cleanEditorHtml(data.bodyHtml || ""),
     bodyMarkdown: "",
     legacySections: [],
-    status: cmsStatus(data.status || "draft"),
-    draft: true,
-    publishedDate: null,
+    status,
+    draft: status !== "published",
+    publishedDate: status === "published" ? now : null,
     readingTime: "",
     category: data.category || "",
     tags: parseTags(data.tags),
@@ -761,7 +786,8 @@ export async function saveRecordAction(formData: FormData) {
       const updated = await updatePageRecord(data);
       await audit("content.updated", "page", updated.id, updated.title, { module: data.module, user: user.email });
       revalidatePath(updated.path);
-      revalidateCmsTags("cms-pages");
+      revalidatePath(updated.previousPath);
+      revalidateCmsTags("cms-pages", "cms-redirects");
     } else if (data.module === "pages") {
       const created = await createPageRecord(data);
       await audit("content.created", "page", created.id, created.title, { module: data.module, user: user.email });
@@ -771,6 +797,7 @@ export async function saveRecordAction(formData: FormData) {
       const updated = await updateBlogRecord(data);
       await audit("content.updated", "blog", updated.id, updated.title, { module: data.module, user: user.email });
       revalidatePath(await blogPathForLanguage(updated.locale, updated.slug));
+      revalidatePath(await blogPathForLanguage(updated.previousLocale, updated.previousSlug));
       revalidateCmsTags("cms-blog");
     } else if (data.module === "blog") {
       const created = await createBlogRecord(data);
@@ -784,6 +811,7 @@ export async function saveRecordAction(formData: FormData) {
     safeAdminRedirect(`/admin/${data.module}?error=${adminErrorCode(error)}`);
   }
 
+  await revalidatePublicModulePaths(data.module as AdminModuleSlug);
   revalidatePath("/admin");
   safeAdminRedirect(`/admin/${data.module}?notice=saved`);
 }
@@ -924,9 +952,7 @@ export async function saveJsonRecordAction(formData: FormData) {
     }
   }
 
-  for (const path of revalidationPathsForModule(moduleSlug)) {
-    revalidatePath(path);
-  }
+  await revalidatePublicModulePaths(moduleSlug, record);
   revalidateCmsTags(...cacheTagsForModule(moduleSlug));
   revalidatePath("/admin");
   await audit("content.json_saved", moduleSlug, parsed.data.id, String(record.title || record.name || record.key || moduleSlug), {
@@ -944,11 +970,17 @@ export async function softDeleteRecordAction(formData: FormData) {
   const now = new Date();
   const collectionName = moduleSlug === "pages" ? "pages" : moduleSlug === "blog" ? "blogPosts" : collectionModuleNames[moduleSlug as AdminModuleSlug];
   if (!collectionName) safeAdminRedirect(`/admin/${moduleSlug}?error=unsupported`);
-  await (await mongoCollection(collectionName)).updateOne(await byId(id), {
-    $set: moduleSlug === "redirects" ? { active: false, updatedAt: now } : { deletedAt: now, status: "soft_deleted", updatedAt: now },
+  const collection = await mongoCollection<Record<string, unknown>>(collectionName);
+  const current = await collection.findOne(await byId(id));
+  await collection.updateOne(await byId(id), {
+    $set:
+      moduleSlug === "redirects"
+        ? { active: false, updatedAt: now }
+        : { deletedAt: now, status: "soft_deleted", ...(moduleSlug === "blog" ? { draft: true } : {}), updatedAt: now },
   });
   await audit("content.deleted", moduleSlug, id);
   revalidateCmsTags(...cacheTagsForModule(moduleSlug as AdminModuleSlug));
+  await revalidatePublicModulePaths(moduleSlug as AdminModuleSlug, current);
   revalidatePath("/admin");
   safeAdminRedirect(`/admin/${moduleSlug}?notice=deleted`);
 }
@@ -960,11 +992,17 @@ export async function restoreRecordAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   const collectionName = moduleSlug === "pages" ? "pages" : moduleSlug === "blog" ? "blogPosts" : collectionModuleNames[moduleSlug as AdminModuleSlug];
   if (!collectionName) safeAdminRedirect(`/admin/${moduleSlug}?error=unsupported`);
-  await (await mongoCollection(collectionName)).updateOne(await byId(id), {
-    $set: moduleSlug === "redirects" ? { active: true, updatedAt: new Date() } : { deletedAt: null, status: "draft", updatedAt: new Date() },
+  const collection = await mongoCollection<Record<string, unknown>>(collectionName);
+  const current = await collection.findOne(await byId(id));
+  await collection.updateOne(await byId(id), {
+    $set:
+      moduleSlug === "redirects"
+        ? { active: true, updatedAt: new Date() }
+        : { deletedAt: null, status: "draft", ...(moduleSlug === "blog" ? { draft: true } : {}), updatedAt: new Date() },
   });
   await audit("content.restored", moduleSlug, id);
   revalidateCmsTags(...cacheTagsForModule(moduleSlug as AdminModuleSlug));
+  await revalidatePublicModulePaths(moduleSlug as AdminModuleSlug, current);
   revalidatePath("/admin");
   safeAdminRedirect(`/admin/${moduleSlug}?notice=restored`);
 }

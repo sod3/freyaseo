@@ -31,6 +31,24 @@ function hashIp(value: string | null) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+type LocalizedMessage = Record<string, string | undefined>;
+
+type ContactFormConfig = {
+  _id?: unknown;
+  active?: boolean;
+  successMessage?: LocalizedMessage;
+  errorMessage?: LocalizedMessage;
+};
+
+function localizedMessage(value: LocalizedMessage | undefined, locale: string, fallback: string) {
+  return value?.[locale] || value?.en || value?.el || fallback;
+}
+
+async function getContactFormConfig() {
+  if (!isMongoConfigured()) return null;
+  return (await mongoCollection<ContactFormConfig & { key: string }>("forms")).findOne({ key: "contact" });
+}
+
 async function getContactFormId() {
   const forms = await mongoCollection("forms");
   const existing = await forms.findOne({ key: "contact" });
@@ -49,9 +67,14 @@ async function getContactFormId() {
 
 export async function POST(request: Request) {
   const payload = await request.json().catch(() => null);
+  const requestedLocale = normalizeLanguageCode(typeof payload?.language === "string" ? payload.language : "en");
+  const formConfig = await getContactFormConfig();
   const parsed = submissionSchema.safeParse(payload);
   if (!parsed.success) {
-    return Response.json({ ok: false, message: "Please check the form and try again." }, { status: 400 });
+    return Response.json(
+      { ok: false, message: localizedMessage(formConfig?.errorMessage, requestedLocale, "Please check the form and try again.") },
+      { status: 400 },
+    );
   }
 
   if (!isMongoConfigured()) {
@@ -71,7 +94,14 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  const formId = await getContactFormId();
+  if (formConfig?.active === false) {
+    return Response.json(
+      { ok: false, message: localizedMessage(formConfig.errorMessage, data.language, "This form is currently unavailable.") },
+      { status: 503 },
+    );
+  }
+
+  const formId = formConfig?._id ? String(formConfig._id) : await getContactFormId();
   await (await mongoCollection("formSubmissions")).insertOne({
     formId,
     formKey: "contact",
@@ -106,5 +136,9 @@ export async function POST(request: Request) {
     createdAt: new Date(),
   });
 
-  return Response.json({ ok: true, stored: true });
+  return Response.json({
+    ok: true,
+    stored: true,
+    message: localizedMessage(formConfig?.successMessage, data.language, "Thank you."),
+  });
 }

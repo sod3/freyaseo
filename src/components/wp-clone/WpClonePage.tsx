@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
 import { wpClonePagesByPath, type WpClonePageData } from "@/src/content/wp-clone/pages";
 import { ServiceEndingCTA } from "@/src/components/services/ServiceEndingCTA";
+import { syncBlogIndexHtml } from "@/src/lib/cms/blog-index-html";
+import { applyCmsContentReplacements } from "@/src/lib/cms/content-overlays";
+import {
+  syncSiteChromeHtml,
+  type CmsFooterSettings,
+  type CmsNavigationSettings,
+  type CmsSiteSettings,
+} from "@/src/lib/cms/site-chrome-html";
+import type { BlogPost, Locale } from "@/src/types";
 import { BackToTopButton } from "./BackToTopButton";
 import { WpCloneBehavior } from "./WpCloneBehavior";
 
@@ -201,8 +210,31 @@ ${normalizeItem(match[4], 1)}
   return `${html.slice(0, match.index)}${normalizedList}${html.slice(match.index + match[0].length)}`;
 }
 
-export function WpClonePage({ page }: { page: RuntimeWpClonePage }) {
-  const html = normalizeHomepageHeroHtml(page, normalizeBlogArticleHtml(page, normalizeServiceSectionHtml(page)));
+export function WpClonePage({
+  page,
+  blogPosts,
+  contentReplacements = [],
+  footerSettings,
+  navigationSettings,
+  siteSettings,
+}: {
+  page: RuntimeWpClonePage;
+  blogPosts?: BlogPost[];
+  contentReplacements?: Array<{ from: string; to: string }>;
+  footerSettings?: CmsFooterSettings | null;
+  navigationSettings?: CmsNavigationSettings | null;
+  siteSettings?: CmsSiteSettings | null;
+}) {
+  const normalizedHtml = normalizeHomepageHeroHtml(page, normalizeBlogArticleHtml(page, normalizeServiceSectionHtml(page)));
+  const overlaidHtml = applyCmsContentReplacements(normalizedHtml, contentReplacements);
+  const contentHtml = blogPosts ? syncBlogIndexHtml(overlaidHtml, blogPosts, page.locale as Locale) : overlaidHtml;
+  const html = syncSiteChromeHtml(contentHtml, {
+    footer: footerSettings,
+    locale: page.locale,
+    navigation: navigationSettings,
+    pagePath: page.path,
+    site: siteSettings,
+  });
   const isServiceDetail = serviceDetailPaths.has(page.path) || html.includes("freya-service-comparison");
   const serviceDetailClass = isServiceDetail ? " service-detail-page" : "";
 

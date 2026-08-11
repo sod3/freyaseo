@@ -15,6 +15,7 @@ Set:
 ```env
 MONGODB_URI=
 MONGODB_DB=
+CMS_PUBLIC_SOURCE=mongo
 AUTH_SECRET=
 CMS_PREVIEW_SECRET=
 INITIAL_ADMIN_EMAIL=
@@ -35,6 +36,7 @@ CLOUDINARY_FOLDER=
 ```
 
 Use `CMS_STORAGE_DRIVER=s3` or `CMS_STORAGE_DRIVER=cloudinary` on Vercel.
+Keep `CMS_PUBLIC_SOURCE=mongo` in production. The `local` source is only for deterministic offline tests and migration-source previews; it does not contain admin changes.
 
 ## Deploy Steps
 

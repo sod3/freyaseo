@@ -98,6 +98,18 @@ test("renders article fallback instead of 404 for a missing translated blog slug
   assert.doesNotMatch(html, /This page could not be found/i);
 });
 
+test("renders the blog index from CMS records inside the preserved WordPress grid", async () => {
+  const response = await render("/blog/");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /wp-block-uagb-post-grid/);
+  assert.match(html, /Why Content Marketing Needs SEO/);
+  assert.match(html, /href="\/blog\/why-content-marketing-needs-seo\/"/);
+  assert.equal((html.match(/class="uagb-post__inner-wrap"/g) || []).length, 4);
+  assert.doesNotMatch(html, /pos-na-anevaseis-istoselida-google/);
+});
+
 test("service pages server-render the AI SEO ending and localized footer", async () => {
   const servicePaths = [
     "/ai-seo-2/",

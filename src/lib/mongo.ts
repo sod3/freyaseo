@@ -74,6 +74,31 @@ export async function withMongo<T>(operation: () => Promise<T>, fallback: T): Pr
   }
 }
 
+export type MongoOperationResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: unknown };
+
+/**
+ * Run a MongoDB read without making an empty/null result indistinguishable from
+ * a connection failure. Public CMS readers use this to keep MongoDB
+ * authoritative (including intentionally empty collections and deleted
+ * records) while retaining the bundled migration source as an outage fallback.
+ */
+export async function tryMongo<T>(operation: () => Promise<T>): Promise<MongoOperationResult<T>> {
+  if (!isMongoConfigured()) {
+    return { ok: false, error: new Error("MONGODB_URI is not configured.") };
+  }
+
+  try {
+    return { ok: true, value: await operation() };
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("CMS MongoDB unavailable; using local migration source.", error);
+    }
+    return { ok: false, error };
+  }
+}
+
 export function mongoNow() {
   return new Date();
 }

@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { can, getCurrentAdminUser, getRequestMeta } from "@/src/lib/admin/auth";
 import { activeLanguages, getLanguageSettings } from "@/src/lib/cms/languages";
@@ -69,8 +69,8 @@ export async function POST(request: Request) {
 
     const result = await (await mongoCollection("mediaAssets")).insertOne(asset);
     await auditUpload("media.uploaded", user.id, title, { source: "inline-editor" });
-    revalidateTag("cms-pages", "max");
-    revalidateTag("cms-blog", "max");
+    updateTag("cms-pages");
+    updateTag("cms-blog");
     revalidatePath("/admin/media");
 
     return NextResponse.json({

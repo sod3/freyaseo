@@ -5,16 +5,25 @@ import { notFound, redirect } from "next/navigation";
 import { CmsSectionRenderer } from "@/src/components/cms/CmsSectionRenderer";
 import { WpClonePage } from "@/src/components/wp-clone/WpClonePage";
 import { normalizePath, siteUrl as fallbackSiteUrl } from "@/src/content/route-map";
+import { getCmsBlogPosts } from "@/src/lib/cms/blog";
 import { getLanguageSettings } from "@/src/lib/cms/languages";
 import { resolveCmsPageAlternates, resolveCmsPageForPath, type CmsRouteResolution } from "@/src/lib/cms/routing";
-import { isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
+import { isMongoConfigured, mongoCollection, tryMongo } from "@/src/lib/mongo";
 import {
   getWpClonePageByPath as getLegacyWpClonePageByPath,
   wpClonePagesByPath,
   type WpClonePageData,
 } from "@/src/content/wp-clone/pages";
-import { getCmsPageRouteIndex, readLocalCmsPageBySourceSlug, type CmsPageRouteEntry } from "./page-index";
+import {
+  getCmsPageRouteIndex,
+  getCmsPageRouteIndexResult,
+  readLocalCmsPageBySourceSlug,
+  type CmsPageRouteEntry,
+} from "./page-index";
 import { readCollection } from "./reader";
+import { readSingleton } from "./reader";
+import { getCmsContentReplacements } from "./content-overlays";
+import type { CmsFooterSettings, CmsNavigationSettings, CmsSiteSettings } from "./site-chrome-html";
 
 type Locale = string;
 type CmsStatus = "published" | "draft" | "hidden" | "soft_deleted";
@@ -120,10 +129,8 @@ async function draftModeEnabled() {
 const readCachedMongoPageByPath = unstable_cache(
   async (normalized: string) => {
     if (!isMongoConfigured()) return null;
-    return withMongo(async () => {
-      const pages = await mongoCollection<CmsPageEntry>("pages");
-      return pages.findOne({ path: normalized, deletedAt: { $ne: true }, status: { $ne: "soft_deleted" } });
-    }, null);
+    const pages = await mongoCollection<CmsPageEntry>("pages");
+    return pages.findOne({ path: normalized, deletedAt: null, status: { $ne: "soft_deleted" } });
   },
   ["cms-page-by-path"],
   { tags: ["cms-pages"] },
@@ -132,10 +139,8 @@ const readCachedMongoPageByPath = unstable_cache(
 const readCachedMongoRedirect = unstable_cache(
   async (normalized: string) => {
     if (!isMongoConfigured()) return null;
-    return withMongo(async () => {
-      const redirects = await mongoCollection<CmsRedirectEntry>("redirects");
-      return redirects.findOne({ sourceUrl: normalized, active: { $ne: false } });
-    }, null);
+    const redirects = await mongoCollection<CmsRedirectEntry>("redirects");
+    return redirects.findOne({ sourceUrl: normalized, active: { $ne: false } });
   },
   ["cms-redirect-by-source"],
   { tags: ["cms-redirects"] },
@@ -201,17 +206,23 @@ export async function getAllCmsWpClonePages() {
 }
 
 export async function getAllWpClonePagePaths() {
-  const cmsPages = await getCmsPageRouteIndex();
+  const routeIndex = await getCmsPageRouteIndexResult();
+  const cmsPages = routeIndex.entries;
   const cmsPaths = cmsPages.map((page) => page.path);
-  return Array.from(new Set([...cmsPaths, ...Object.keys(wpClonePagesByPath)]));
+  return routeIndex.source === "mongo"
+    ? Array.from(new Set(cmsPaths))
+    : Array.from(new Set([...cmsPaths, ...Object.keys(wpClonePagesByPath)]));
 }
 
 async function getFullCmsPageForRouteEntry(entry: CmsPageRouteEntry) {
   const normalized = normalizeForLookup(entry.path);
 
   if (shouldReadMongo() && isMongoConfigured()) {
-    const mongoPage = await readCachedMongoPageByPath(normalized);
-    if (mongoPage) return toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage);
+    const result = await tryMongo(() => readCachedMongoPageByPath(normalized));
+    if (result.ok) {
+      const mongoPage = result.value;
+      return mongoPage ? toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage) : null;
+    }
   }
 
   const sourceSlug = entry.sourceSlug || entry.slug;
@@ -224,7 +235,11 @@ async function getFullCmsPageForRouteEntry(entry: CmsPageRouteEntry) {
 export async function getCmsWpClonePageByPath(pathname: string) {
   const normalized = normalizeForLookup(pathname);
   const drafts = await draftModeEnabled();
-  const mongoPage = shouldReadMongo() && isMongoConfigured() ? await readCachedMongoPageByPath(normalized) : null;
+  const mongoResult =
+    shouldReadMongo() && isMongoConfigured()
+      ? await tryMongo(() => readCachedMongoPageByPath(normalized))
+      : null;
+  const mongoPage = mongoResult?.ok ? mongoResult.value : null;
   const resolvedPage = mongoPage ? toCmsPage(mongoPage.sourceSlug || mongoPage.slug || normalized, mongoPage) : null;
 
   if (resolvedPage) {
@@ -232,8 +247,9 @@ export async function getCmsWpClonePageByPath(pathname: string) {
   }
 
   const languageSettings = await getLanguageSettings();
-  const cmsPages = await getCmsPageRouteIndex();
-  const legacyPages = getLegacyCmsPages();
+  const routeIndex = await getCmsPageRouteIndexResult();
+  const cmsPages = routeIndex.entries;
+  const legacyPages = routeIndex.source === "mongo" ? [] : getLegacyCmsPages();
   const pages = [...cmsPages, ...legacyPages];
   const resolution = resolveCmsPageForPath(pages, normalized, languageSettings, { includeDrafts: drafts });
   if (resolution.page) {
@@ -243,14 +259,15 @@ export async function getCmsWpClonePageByPath(pathname: string) {
     return fullPage ? applyTranslationFallback(fullPage, resolution) : null;
   }
 
-  const legacyPage = getLegacyWpClonePageByPath(normalized);
+  const legacyPage = routeIndex.source === "local" ? getLegacyWpClonePageByPath(normalized) : null;
   return legacyPage ? { ...legacyPage, status: "published" as const, renderMode: "wordpressHtml" as const } : null;
 }
 
 export async function getCmsRedirect(pathname: string) {
   const normalized = normalizeForLookup(pathname);
   if (shouldReadMongo() && isMongoConfigured()) {
-    return readCachedMongoRedirect(normalized);
+    const result = await tryMongo(() => readCachedMongoRedirect(normalized));
+    if (result.ok) return result.value;
   }
 
   const redirects = await readCollection<CmsRedirectEntry>("redirects");
@@ -344,5 +361,22 @@ export async function WpClonePageForPath({ pathname }: { pathname: string }) {
     return <CmsSectionRenderer sections={page.sections} locale={page.locale} />;
   }
 
-  return <WpClonePage page={page} />;
+  const blogLocale = page.path === "/blog/" ? "en" : page.path === "/el/seo-blog/" ? "el" : null;
+  const [blogPosts, navigationSettings, footerSettings, siteSettings, contentReplacements] = await Promise.all([
+    blogLocale ? getCmsBlogPosts(blogLocale) : Promise.resolve(undefined),
+    readSingleton<CmsNavigationSettings>("navigationSettings"),
+    readSingleton<CmsFooterSettings>("footerSettings"),
+    readSingleton<CmsSiteSettings>("siteSettings"),
+    getCmsContentReplacements(),
+  ]);
+  return (
+    <WpClonePage
+      page={page}
+      blogPosts={blogPosts}
+      contentReplacements={contentReplacements}
+      navigationSettings={navigationSettings}
+      footerSettings={footerSettings}
+      siteSettings={siteSettings}
+    />
+  );
 }

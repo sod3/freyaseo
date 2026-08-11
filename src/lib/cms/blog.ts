@@ -4,9 +4,9 @@ import sanitizeHtml from "sanitize-html";
 import { blogPosts as legacyBlogPosts } from "@/src/content/blog";
 import { normalizePath } from "@/src/content/route-map";
 import { activeLanguages, composeLanguagePath, type CmsLanguageSettings } from "@/src/lib/cms/languages";
-import { isMongoConfigured, mongoCollection, withMongo } from "@/src/lib/mongo";
+import { isMongoConfigured, mongoCollection, tryMongo } from "@/src/lib/mongo";
 import type { BlogPost, Locale } from "@/src/types";
-import { readCollection } from "./reader";
+import { readLocalCollection } from "./file-store";
 
 type LocalizedString = {
   en?: string;
@@ -21,10 +21,13 @@ type CmsBlogPostEntry = {
   featuredImage?: string | null;
   featuredImageAlt?: LocalizedString;
   authorName?: string;
+  category?: string;
   categoryName?: string;
   readingTime?: string;
   publishedDate?: string | null;
   draft?: boolean;
+  status?: string;
+  deletedAt?: Date | string | null;
   bodyHtml?: string;
   bodyMarkdown?: string;
   legacySections?: BlogPost["content"];
@@ -145,7 +148,7 @@ async function includeDrafts() {
 }
 
 async function getLocalCmsBlogPosts(locale: Locale) {
-  const entries = await readCollection<CmsBlogPostEntry>("blogPosts");
+  const entries = await readLocalCollection<CmsBlogPostEntry>("blogPosts");
   const drafts = await includeDrafts();
   return entries
     .filter(({ entry }) => entry.language === locale)
@@ -156,14 +159,15 @@ async function getLocalCmsBlogPosts(locale: Locale) {
 const readCachedMongoBlogList = unstable_cache(
   async (locale: Locale) => {
     if (!isMongoConfigured()) return [];
-    return withMongo(async () => {
-      const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
-      return posts
-        .find(
-          {
-            language: locale,
-            draft: { $ne: true },
-          },
+    const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
+    return posts
+      .find(
+        {
+          language: locale,
+          status: "published",
+          draft: { $ne: true },
+          deletedAt: null,
+        },
           {
             projection: {
               title: 1,
@@ -182,10 +186,9 @@ const readCachedMongoBlogList = unstable_cache(
               updatedAt: 1,
             },
           },
-        )
-        .sort({ publishedDate: -1, updatedAt: -1 })
-        .toArray();
-    }, []);
+      )
+      .sort({ publishedDate: -1, updatedAt: -1 })
+      .toArray();
   },
   ["cms-blog-list"],
   { tags: ["cms-blog"] },
@@ -194,14 +197,14 @@ const readCachedMongoBlogList = unstable_cache(
 const readCachedMongoBlogPost = unstable_cache(
   async (locale: Locale, slug: string) => {
     if (!isMongoConfigured()) return null;
-    return withMongo(async () => {
-      const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
-      return posts.findOne({
-        language: locale,
-        slug,
-        draft: { $ne: true },
-      });
-    }, null);
+    const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
+    return posts.findOne({
+      language: locale,
+      slug,
+      status: "published",
+      draft: { $ne: true },
+      deletedAt: null,
+    });
   },
   ["cms-blog-post"],
   { tags: ["cms-blog"] },
@@ -210,19 +213,19 @@ const readCachedMongoBlogPost = unstable_cache(
 const readCachedMongoBlogSlugs = unstable_cache(
   async (locale: Locale) => {
     if (!isMongoConfigured()) return [];
-    return withMongo(async () => {
-      const posts = await mongoCollection<{ slug?: string; language: Locale; draft?: boolean }>("blogPosts");
-      const records = await posts
-        .find(
-          {
-            language: locale,
-            draft: { $ne: true },
-          },
-          { projection: { slug: 1 } },
-        )
-        .toArray();
-      return records.map((record) => String(record.slug || "")).filter(Boolean);
-    }, []);
+    const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
+    const records = await posts
+      .find(
+        {
+          language: locale,
+          status: "published",
+          draft: { $ne: true },
+          deletedAt: null,
+        },
+        { projection: { slug: 1 } },
+      )
+      .toArray();
+    return records.map((record) => String(record.slug || "")).filter(Boolean);
   },
   ["cms-blog-slugs"],
   { tags: ["cms-blog"] },
@@ -238,7 +241,7 @@ function toBlogPost(slug: string, entry: CmsBlogPostEntry): BlogPost {
     excerpt: entry.excerpt || "",
     image: entry.featuredImage || entry.existingImagePath || "/og.png",
     imageAlt: localized(entry.featuredImageAlt, entry.language) || entry.title,
-    category: entry.categoryName || "",
+    category: entry.categoryName || entry.category || "",
     readingTime: entry.readingTime || "",
     publicationDate: entry.publishedDate || "2026-07-14",
     author: entry.authorName || "Pavlina Hörmann",
@@ -259,13 +262,16 @@ function withFallbackLocale(post: BlogPost, locale: Locale): BlogPost {
 export async function getCmsBlogPosts(locale: Locale): Promise<BlogPost[]> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
-    const records = drafts
-      ? await withMongo(async () => {
+    const result = await tryMongo(async () =>
+      drafts
+        ? await (async () => {
           const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
           return posts
             .find(
               {
                 language: locale,
+                status: { $ne: "soft_deleted" },
+                deletedAt: null,
               },
               {
                 projection: {
@@ -288,10 +294,12 @@ export async function getCmsBlogPosts(locale: Locale): Promise<BlogPost[]> {
             )
             .sort({ publishedDate: -1, updatedAt: -1 })
             .toArray();
-        }, [])
-      : await readCachedMongoBlogList(locale);
-    const cmsPosts = records.map((record) => toBlogPost(String(record.slug || ""), record));
-    if (cmsPosts.length) return cmsPosts;
+        })()
+        : await readCachedMongoBlogList(locale),
+    );
+    if (result.ok) {
+      return result.value.map((record) => toBlogPost(String(record.slug || ""), record));
+    }
   }
 
   const localPosts = await getLocalCmsBlogPosts(locale);
@@ -302,14 +310,15 @@ export async function getCmsBlogPosts(locale: Locale): Promise<BlogPost[]> {
 export async function getCmsBlogPost(locale: Locale, slug: string): Promise<BlogPost | null> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
-    const record = drafts
-      ? await withMongo(async () => {
+    const result = await tryMongo(async () =>
+      drafts
+        ? await (async () => {
           const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
-          return posts.findOne({ language: locale, slug });
-        }, null)
-      : await readCachedMongoBlogPost(locale, slug);
-    const post = record ? toBlogPost(slug, record) : null;
-    if (post) return post;
+          return posts.findOne({ language: locale, slug, status: { $ne: "soft_deleted" }, deletedAt: null });
+        })()
+        : await readCachedMongoBlogPost(locale, slug),
+    );
+    if (result.ok) return result.value ? toBlogPost(slug, result.value) : null;
   }
 
   const posts = await getLocalCmsBlogPosts(locale);
@@ -327,18 +336,18 @@ export async function getCmsBlogPost(locale: Locale, slug: string): Promise<Blog
 export async function getCmsBlogSlugs(locale: Locale): Promise<string[]> {
   if (shouldReadMongo() && isMongoConfigured()) {
     const drafts = await includeDrafts();
-    const mongoSlugs = drafts
-      ? await withMongo(async () => {
-          const posts = await mongoCollection<{ slug?: string; language: Locale; draft?: boolean }>("blogPosts");
-          const records = await posts.find({ language: locale }, { projection: { slug: 1 } }).toArray();
+    const result = await tryMongo(async () =>
+      drafts
+        ? await (async () => {
+          const posts = await mongoCollection<CmsBlogPostEntry & { slug?: string }>("blogPosts");
+          const records = await posts
+            .find({ language: locale, status: { $ne: "soft_deleted" }, deletedAt: null }, { projection: { slug: 1 } })
+            .toArray();
           return records.map((record) => String(record.slug || "")).filter(Boolean);
-        }, [])
-      : await readCachedMongoBlogSlugs(locale);
-    if (mongoSlugs.length) {
-      const legacySlugs = legacyBlogPosts[locale].map((post) => post.slug);
-      const fallbackSlugs = locale === "en" ? [] : await getCmsBlogSlugs("en");
-      return Array.from(new Set([...mongoSlugs, ...legacySlugs, ...fallbackSlugs]));
-    }
+        })()
+        : await readCachedMongoBlogSlugs(locale),
+    );
+    if (result.ok) return result.value;
   }
 
   const cmsPosts = await getLocalCmsBlogPosts(locale);
