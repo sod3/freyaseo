@@ -73,7 +73,7 @@ export function revalidationPathsForModule(module: AdminModuleSlug) {
     return ["/", "/sitemap.xml", "/robots.txt"];
   }
   if (module === "forms") return ["/contact-2/", "/el/lets-contact/"];
-  if (module === "blog") return ["/blog/", "/el/seo-blog/"];
+  if (module === "blog") return ["/blog/", "/el/seo-blog/", "/sitemap.xml"];
   if (module === "services" || module === "tools") {
     return ["/seo-marketing/", "/tool-generation/", "/el/seo-marketing-2/", "/el/tool-generation-2/"];
   }

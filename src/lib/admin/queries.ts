@@ -1,4 +1,4 @@
-import type { Collection, Document, Sort } from "mongodb";
+import type { Collection, Document, Filter, Sort } from "mongodb";
 import { documentId, isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
 import { activeLanguages, getLanguageSettings } from "@/src/lib/cms/languages";
 import { collectionModuleNames, settingModuleKeys } from "./module-config";
@@ -9,6 +9,7 @@ export type AdminRecord = {
   title: string;
   description?: string;
   status?: string;
+  deleted?: boolean;
   language?: string;
   href?: string;
   updatedAt?: Date | null;
@@ -159,6 +160,7 @@ const blogListProjection = {
   title: 1,
   excerpt: 1,
   status: 1,
+  deletedAt: 1,
   draft: 1,
   language: 1,
   locale: 1,
@@ -382,23 +384,28 @@ export async function getModuleRecords(
       },
     };
   };
-  const readPagedDocuments = async <T extends Document>(collection: Collection<T>, projection: Document, sort: Sort) => {
+  const readPagedDocuments = async <T extends Document>(
+    collection: Collection<T>,
+    projection: Document,
+    sort: Sort,
+    filter: Filter<T> = {},
+  ) => {
     if (hasActiveFilters) {
       return {
-        documents: await collection.find({}, { projection }).sort(sort).limit(250).toArray(),
+        documents: await collection.find(filter, { projection }).sort(sort).limit(250).toArray(),
         total: null,
       };
     }
 
     const requestedStart = (requestedPage - 1) * pageSize;
     const [total, documents] = await Promise.all([
-      collection.countDocuments({}),
-      collection.find({}, { projection }).sort(sort).skip(requestedStart).limit(pageSize).toArray(),
+      collection.countDocuments(filter),
+      collection.find(filter, { projection }).sort(sort).skip(requestedStart).limit(pageSize).toArray(),
     ]);
     const page = paginate(total);
     if (page.start !== requestedStart && total > 0) {
       return {
-        documents: await collection.find({}, { projection }).sort(sort).skip(page.start).limit(pageSize).toArray(),
+        documents: await collection.find(filter, { projection }).sort(sort).skip(page.start).limit(pageSize).toArray(),
         total,
       };
     }
@@ -462,15 +469,21 @@ export async function getModuleRecords(
       .sort((left, right) => pageSortRank(left.href || "") - pageSortRank(right.href || "") || (left.href || "").localeCompare(right.href || ""));
   } else if (slug === "blog") {
     const collection = await mongoCollection<Record<string, unknown>>("blogPosts");
-    const { documents: posts, total } = await readPagedDocuments(collection, blogListProjection, { updatedAt: -1 });
+    const deletedView = filters.status?.toLowerCase() === "deleted";
+    const visibilityFilter: Filter<Record<string, unknown>> = deletedView
+      ? { $or: [{ deletedAt: { $ne: null } }, { status: "soft_deleted" }] }
+      : { deletedAt: null, status: { $ne: "soft_deleted" } };
+    const { documents: posts, total } = await readPagedDocuments(collection, blogListProjection, { updatedAt: -1 }, visibilityFilter);
     records = posts.map((post) => {
       const locale = String(post.language || post.locale || "en");
       const postSlug = String(post.slug || "");
+      const deleted = Boolean(post.deletedAt) || String(post.status || "").toLowerCase() === "soft_deleted";
       return {
         id: documentId(post),
         title: String(post.title || ""),
         description: String(post.excerpt || ""),
-        status: statusLabel(String(post.status || (post.draft ? "draft" : "published"))),
+        status: deleted ? "Deleted" : statusLabel(String(post.status || (post.draft ? "draft" : "published"))),
+        deleted,
         language: locale,
         href: locale === "el" ? `/el/seo-blog/${postSlug}/` : `/blog/${postSlug}/`,
         updatedAt: post.updatedAt instanceof Date ? post.updatedAt : null,

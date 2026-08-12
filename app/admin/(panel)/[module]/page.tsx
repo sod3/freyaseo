@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Filter } from "lucide-react";
-import { changePasswordAction, exportModuleAction, uploadMediaAction } from "@/src/lib/admin/actions";
+import { Download, Filter, RotateCcw } from "lucide-react";
+import { AdminDeleteButton } from "@/src/components/admin/AdminDeleteButton";
+import {
+  changePasswordAction,
+  exportModuleAction,
+  restoreRecordAction,
+  softDeleteRecordAction,
+  uploadMediaAction,
+} from "@/src/lib/admin/actions";
 import { can, createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { creatableCmsModules, editableCmsModules } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
@@ -282,10 +289,29 @@ export default async function AdminModulePage({
                   <td>{record.updatedAt?.toLocaleDateString() || ""}</td>
                   <td>
                     <div className="admin-actions">
-                      {editableCmsModules.has(adminModule.slug) ? (
+                      {editableCmsModules.has(adminModule.slug) && !record.deleted ? (
                         <Link className="admin-button admin-button-secondary" href={`/admin/${adminModule.slug}?edit=${record.id}`}>
                           Edit
                         </Link>
+                      ) : null}
+                      {adminModule.slug === "blog" && record.deleted && canWrite ? (
+                        <form action={restoreRecordAction}>
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <input type="hidden" name="module" value="blog" />
+                          <input type="hidden" name="id" value={record.id} />
+                          <button className="admin-button admin-button-secondary" type="submit">
+                            <RotateCcw size={17} aria-hidden />
+                            Restore
+                          </button>
+                        </form>
+                      ) : null}
+                      {adminModule.slug === "blog" && !record.deleted && canWrite ? (
+                        <form action={softDeleteRecordAction}>
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <input type="hidden" name="module" value="blog" />
+                          <input type="hidden" name="id" value={record.id} />
+                          <AdminDeleteButton recordTitle={record.title} />
+                        </form>
                       ) : null}
                     </div>
                   </td>
