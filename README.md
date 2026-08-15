@@ -62,6 +62,8 @@ The private CMS is available at:
 
 Admin routes are protected, no-indexed, excluded from robots, and backed by secure HTTP-only session cookies. The CMS supports database records for pages, page sections, blog posts, services, tools, certificates, FAQs, media, navigation, footer/settings, SEO metadata, redirects, form submissions, users, roles, sessions, revisions and audit logs.
 
+The recovery center at `/admin/backups` creates encrypted, checksummed database-and-media checkpoints, verifies them, restores them with an automatic pre-restore safety checkpoint, and provides conflict-safe undo for individual admin updates. See `DATABASE_BACKUP_GUIDE.md` before enabling it in production.
+
 Required environment variables are listed in `.env.example`. At minimum, production needs:
 
 ```env

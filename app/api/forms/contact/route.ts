@@ -3,6 +3,7 @@ import sanitizeHtml from "sanitize-html";
 import { z } from "zod";
 import { isValidLanguageCode, normalizeLanguageCode } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
+import { assertNoRestoreInProgress, BackupBusyError } from "@/src/lib/admin/backup-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,15 @@ export async function POST(request: Request) {
 
   if (!isMongoConfigured()) {
     return Response.json({ ok: true, stored: false });
+  }
+
+  try {
+    await assertNoRestoreInProgress();
+  } catch (error) {
+    if (error instanceof BackupBusyError) {
+      return Response.json({ ok: false, message: "The website is being updated. Please try again in a moment." }, { status: 503 });
+    }
+    throw error;
   }
 
   const forwardedFor = request.headers.get("x-forwarded-for");

@@ -177,6 +177,12 @@ async function ensureIndexes(db) {
     db.collection("settings").createIndex({ key: 1 }, { unique: true }),
     db.collection("auditLogs").createIndex({ createdAt: -1 }),
     db.collection("formSubmissions").createIndex({ formKey: 1, createdAt: -1 }),
+    db.collection("websiteBackups").createIndex({ createdAt: -1 }),
+    db.collection("websiteBackups").createIndex({ status: 1, createdAt: -1 }),
+    db.collection("adminChanges").createIndex({ createdAt: -1 }),
+    db.collection("adminChanges").createIndex({ collectionName: 1, entityId: 1, createdAt: -1 }),
+    db.collection("websiteBackupLocks").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection("websiteRestoreOperations").createIndex({ createdAt: -1 }),
   ];
 
   indexOperations.push(

@@ -17,7 +17,6 @@ import {
 } from "@/src/lib/cms/languages";
 import { saveUpload, StorageUploadError } from "@/src/lib/storage";
 import {
-  can,
   createSession,
   getCurrentAdminUser,
   getRequestMeta,
@@ -35,6 +34,8 @@ import {
   writePermissionForModule,
 } from "./module-config";
 import type { AdminModuleSlug } from "./modules";
+import { assertNoRestoreInProgress } from "./backup-lock";
+import { recordAdminChange } from "./change-history";
 
 const loginSchema = z.object({
   email: z.string().email().transform((value) => value.toLowerCase()),
@@ -493,6 +494,7 @@ export async function logoutAction() {
 export async function changePasswordAction(formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/settings?error=session");
   const user = await requireAdminUser("dashboard.view");
+  await assertNoRestoreInProgress();
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
@@ -520,7 +522,7 @@ export async function changePasswordAction(formData: FormData) {
   safeAdminRedirect("/admin/settings?notice=password-updated");
 }
 
-async function updatePageRecord(data: z.infer<typeof recordSchema>) {
+async function updatePageRecord(data: z.infer<typeof recordSchema>, user: { id: string; email: string }) {
   const pages = await mongoCollection<Record<string, unknown>>("pages");
   const current = await pages.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Page not found.");
@@ -569,8 +571,24 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
     },
   });
 
+  const updatedPage = await pages.findOne(await byId(documentId(current)));
+  if (updatedPage) {
+    await recordAdminChange({
+      action: "page.updated",
+      module: "pages",
+      collectionName: "pages",
+      entityId: documentId(current),
+      entityName: data.title,
+      userId: user.id,
+      userEmail: user.email,
+      before: current,
+      after: updatedPage,
+    });
+  }
+
   if (data.createRedirect && nextPath !== current.path) {
     const redirects = await mongoCollection("redirects");
+    const previousRedirect = await redirects.findOne({ sourceUrl: current.path });
     await redirects.updateOne(
       { sourceUrl: current.path },
       {
@@ -585,6 +603,20 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
       },
       { upsert: true },
     );
+    const nextRedirect = await redirects.findOne({ sourceUrl: current.path });
+    if (nextRedirect) {
+      await recordAdminChange({
+        action: previousRedirect ? "redirect.updated" : "redirect.created",
+        module: "redirects",
+        collectionName: "redirects",
+        entityId: documentId(nextRedirect),
+        entityName: String(current.path || "Redirect"),
+        userId: user.id,
+        userEmail: user.email,
+        before: previousRedirect,
+        after: nextRedirect,
+      });
+    }
   }
 
   const revisions = await mongoCollection("pageRevisions");
@@ -605,7 +637,7 @@ async function updatePageRecord(data: z.infer<typeof recordSchema>) {
   return { id: documentId(current), title: data.title, path: nextPath, previousPath: String(current.path || nextPath) };
 }
 
-async function createPageRecord(data: z.infer<typeof recordSchema>) {
+async function createPageRecord(data: z.infer<typeof recordSchema>, user: { id: string; email: string }) {
   const pages = await mongoCollection<Record<string, unknown>>("pages");
   const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `page-${Date.now()}`);
@@ -650,10 +682,24 @@ async function createPageRecord(data: z.infer<typeof recordSchema>) {
     createdAt: now,
     updatedAt: now,
   });
+  const createdPage = await pages.findOne({ _id: result.insertedId });
+  if (createdPage) {
+    await recordAdminChange({
+      action: "page.created",
+      module: "pages",
+      collectionName: "pages",
+      entityId: result.insertedId.toHexString(),
+      entityName: data.title,
+      userId: user.id,
+      userEmail: user.email,
+      before: null,
+      after: createdPage,
+    });
+  }
   return { id: result.insertedId.toHexString(), title: data.title, path };
 }
 
-async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
+async function updateBlogRecord(data: z.infer<typeof recordSchema>, user: { id: string; email: string }) {
   const posts = await mongoCollection<Record<string, unknown>>("blogPosts");
   const current = await posts.findOne(await byId(data.id || ""));
   if (!current) throw new Error("Blog post not found.");
@@ -697,6 +743,20 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
       updatedAt: now,
     },
   });
+  const updatedPost = await posts.findOne(await byId(documentId(current)));
+  if (updatedPost) {
+    await recordAdminChange({
+      action: "blog.updated",
+      module: "blog",
+      collectionName: "blogPosts",
+      entityId: documentId(current),
+      entityName: data.title,
+      userId: user.id,
+      userEmail: user.email,
+      before: current,
+      after: updatedPost,
+    });
+  }
   await (await mongoCollection("blogRevisions")).insertOne({
     blogPostId: documentId(current),
     action: "admin_update",
@@ -714,7 +774,7 @@ async function updateBlogRecord(data: z.infer<typeof recordSchema>) {
   };
 }
 
-async function createBlogRecord(data: z.infer<typeof recordSchema>) {
+async function createBlogRecord(data: z.infer<typeof recordSchema>, user: { id: string; email: string }) {
   const posts = await mongoCollection<Record<string, unknown>>("blogPosts");
   const locale = normalizeLanguageCode(data.language || "en");
   const slug = slugify(data.slug || data.title, `post-${Date.now()}`);
@@ -749,12 +809,27 @@ async function createBlogRecord(data: z.infer<typeof recordSchema>) {
     createdAt: now,
     updatedAt: now,
   });
+  const createdPost = await posts.findOne({ _id: result.insertedId });
+  if (createdPost) {
+    await recordAdminChange({
+      action: "blog.created",
+      module: "blog",
+      collectionName: "blogPosts",
+      entityId: result.insertedId.toHexString(),
+      entityName: data.title,
+      userId: user.id,
+      userEmail: user.email,
+      before: null,
+      after: createdPost,
+    });
+  }
   return { id: result.insertedId.toHexString(), title: data.title, slug, locale };
 }
 
 export async function saveRecordAction(formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/dashboard?error=session");
   const user = await requireAdminUser("content.write");
+  await assertNoRestoreInProgress();
   const parsed = recordSchema.safeParse({
     module: formData.get("module"),
     id: formData.get("id") || undefined,
@@ -783,24 +858,24 @@ export async function saveRecordAction(formData: FormData) {
   const data = parsed.data;
   try {
     if (data.module === "pages" && data.id) {
-      const updated = await updatePageRecord(data);
+      const updated = await updatePageRecord(data, user);
       await audit("content.updated", "page", updated.id, updated.title, { module: data.module, user: user.email });
       revalidatePath(updated.path);
       revalidatePath(updated.previousPath);
       revalidateCmsTags("cms-pages", "cms-redirects");
     } else if (data.module === "pages") {
-      const created = await createPageRecord(data);
+      const created = await createPageRecord(data, user);
       await audit("content.created", "page", created.id, created.title, { module: data.module, user: user.email });
       revalidatePath(created.path);
       revalidateCmsTags("cms-pages");
     } else if (data.module === "blog" && data.id) {
-      const updated = await updateBlogRecord(data);
+      const updated = await updateBlogRecord(data, user);
       await audit("content.updated", "blog", updated.id, updated.title, { module: data.module, user: user.email });
       revalidatePath(await blogPathForLanguage(updated.locale, updated.slug));
       revalidatePath(await blogPathForLanguage(updated.previousLocale, updated.previousSlug));
       revalidateCmsTags("cms-blog");
     } else if (data.module === "blog") {
-      const created = await createBlogRecord(data);
+      const created = await createBlogRecord(data, user);
       await audit("content.created", "blog", created.id, created.title, { module: data.module, user: user.email });
       revalidatePath(await blogPathForLanguage(created.locale, created.slug));
       revalidateCmsTags("cms-blog");
@@ -819,6 +894,7 @@ export async function saveRecordAction(formData: FormData) {
 export async function createPageTranslationAction(targetLocale: string, formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/pages?error=session");
   const user = await requireAdminUser("content.write");
+  await assertNoRestoreInProgress();
   const parsed = pageTranslationSchema.safeParse({
     sourcePageId: formData.get("sourcePageId"),
     locale: targetLocale,
@@ -862,6 +938,20 @@ export async function createPageTranslationAction(targetLocale: string, formData
         updatedAt: now,
       },
     });
+    const updatedSource = await pages.findOne(await byId(documentId(source)));
+    if (updatedSource) {
+      await recordAdminChange({
+        action: "page.translation_linked",
+        module: "pages",
+        collectionName: "pages",
+        entityId: documentId(source),
+        entityName: title,
+        userId: user.id,
+        userEmail: user.email,
+        before: source,
+        after: updatedSource,
+      });
+    }
   }
 
   const result = await pages.insertOne({
@@ -883,6 +973,20 @@ export async function createPageTranslationAction(targetLocale: string, formData
     createdAt: now,
     updatedAt: now,
   });
+  const createdTranslation = await pages.findOne({ _id: result.insertedId });
+  if (createdTranslation) {
+    await recordAdminChange({
+      action: "page.translation_created",
+      module: "pages",
+      collectionName: "pages",
+      entityId: result.insertedId.toHexString(),
+      entityName: title,
+      userId: user.id,
+      userEmail: user.email,
+      before: null,
+      after: createdTranslation,
+    });
+  }
 
   await audit("content.translation_created", "page", result.insertedId.toHexString(), title, {
     sourcePageId: documentId(source),
@@ -908,6 +1012,7 @@ export async function saveJsonRecordAction(formData: FormData) {
   if (!storage.collectionName && !storage.settingKey) safeAdminRedirect(`/admin/${moduleSlug}?error=unsupported`);
 
   const user = await requireAdminUser(writePermissionForModule(moduleSlug));
+  await assertNoRestoreInProgress();
   let record: Record<string, unknown> = {};
   try {
     record = parseEditableJson(parsed.data.jsonData);
@@ -920,7 +1025,9 @@ export async function saveJsonRecordAction(formData: FormData) {
 
   const now = new Date();
   if (storage.settingKey) {
-    await (await mongoCollection("settings")).updateOne(
+    const settings = await mongoCollection("settings");
+    const previousSetting = await settings.findOne({ key: storage.settingKey });
+    await settings.updateOne(
       { key: storage.settingKey },
       {
         $set: { key: storage.settingKey, value: record, updatedAt: now },
@@ -928,9 +1035,24 @@ export async function saveJsonRecordAction(formData: FormData) {
       },
       { upsert: true },
     );
+    const nextSetting = await settings.findOne({ key: storage.settingKey });
+    if (nextSetting) {
+      await recordAdminChange({
+        action: previousSetting ? `${moduleSlug}.updated` : `${moduleSlug}.created`,
+        module: moduleSlug,
+        collectionName: "settings",
+        entityId: documentId(nextSetting),
+        entityName: String(storage.settingKey),
+        userId: user.id,
+        userEmail: user.email,
+        before: previousSetting,
+        after: nextSetting,
+      });
+    }
     if (moduleSlug === "languages") {
       const languageRecord = record as unknown as CmsLanguageSettings;
-      await (await mongoCollection("settings")).updateOne(
+      const previousSiteSettings = await settings.findOne({ key: "site-settings" });
+      await settings.updateOne(
         { key: "site-settings" },
         {
           $set: {
@@ -942,13 +1064,45 @@ export async function saveJsonRecordAction(formData: FormData) {
         },
         { upsert: true },
       );
+      const nextSiteSettings = await settings.findOne({ key: "site-settings" });
+      if (nextSiteSettings) {
+        await recordAdminChange({
+          action: "languages.site_settings_synced",
+          module: "languages",
+          collectionName: "settings",
+          entityId: documentId(nextSiteSettings),
+          entityName: "site-settings",
+          userId: user.id,
+          userEmail: user.email,
+          before: previousSiteSettings,
+          after: nextSiteSettings,
+        });
+      }
     }
   } else if (storage.collectionName) {
     const collection = await mongoCollection(storage.collectionName);
+    let previousRecord: Document | null = null;
+    let nextRecord: Document | null = null;
     if (parsed.data.id && parsed.data.id !== "new") {
+      previousRecord = await collection.findOne(await byId(parsed.data.id));
       await collection.updateOne(await byId(parsed.data.id), { $set: { ...record, updatedAt: now } });
+      nextRecord = await collection.findOne(await byId(parsed.data.id));
     } else {
-      await collection.insertOne({ ...defaultJsonForModule(moduleSlug), ...record, createdAt: now, updatedAt: now });
+      const result = await collection.insertOne({ ...defaultJsonForModule(moduleSlug), ...record, createdAt: now, updatedAt: now });
+      nextRecord = await collection.findOne({ _id: result.insertedId });
+    }
+    if (nextRecord) {
+      await recordAdminChange({
+        action: previousRecord ? `${moduleSlug}.updated` : `${moduleSlug}.created`,
+        module: moduleSlug,
+        collectionName: storage.collectionName,
+        entityId: documentId(nextRecord),
+        entityName: String(record.title || record.name || record.key || moduleSlug),
+        userId: user.id,
+        userEmail: user.email,
+        before: previousRecord,
+        after: nextRecord,
+      });
     }
   }
 
@@ -964,7 +1118,8 @@ export async function saveJsonRecordAction(formData: FormData) {
 
 export async function softDeleteRecordAction(formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/dashboard?error=session");
-  await requireAdminUser("content.write");
+  const user = await requireAdminUser("content.write");
+  await assertNoRestoreInProgress();
   const moduleSlug = String(formData.get("module") || "");
   const id = String(formData.get("id") || "");
   const now = new Date();
@@ -978,6 +1133,20 @@ export async function softDeleteRecordAction(formData: FormData) {
         ? { active: false, updatedAt: now }
         : { deletedAt: now, status: "soft_deleted", ...(moduleSlug === "blog" ? { draft: true } : {}), updatedAt: now },
   });
+  const deletedRecord = await collection.findOne(await byId(id));
+  if (current && deletedRecord) {
+    await recordAdminChange({
+      action: `${moduleSlug}.deleted`,
+      module: moduleSlug as AdminModuleSlug,
+      collectionName,
+      entityId: id,
+      entityName: String(current.title || current.name || current.slug || id),
+      userId: user.id,
+      userEmail: user.email,
+      before: current,
+      after: deletedRecord,
+    });
+  }
   await audit("content.deleted", moduleSlug, id);
   revalidateCmsTags(...cacheTagsForModule(moduleSlug as AdminModuleSlug));
   await revalidatePublicModulePaths(moduleSlug as AdminModuleSlug, current);
@@ -987,7 +1156,8 @@ export async function softDeleteRecordAction(formData: FormData) {
 
 export async function restoreRecordAction(formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/dashboard?error=session");
-  await requireAdminUser("content.write");
+  const user = await requireAdminUser("content.write");
+  await assertNoRestoreInProgress();
   const moduleSlug = String(formData.get("module") || "");
   const id = String(formData.get("id") || "");
   const collectionName = moduleSlug === "pages" ? "pages" : moduleSlug === "blog" ? "blogPosts" : collectionModuleNames[moduleSlug as AdminModuleSlug];
@@ -1000,6 +1170,20 @@ export async function restoreRecordAction(formData: FormData) {
         ? { active: true, updatedAt: new Date() }
         : { deletedAt: null, status: "draft", ...(moduleSlug === "blog" ? { draft: true } : {}), updatedAt: new Date() },
   });
+  const restoredRecord = await collection.findOne(await byId(id));
+  if (current && restoredRecord) {
+    await recordAdminChange({
+      action: `${moduleSlug}.restored`,
+      module: moduleSlug as AdminModuleSlug,
+      collectionName,
+      entityId: id,
+      entityName: String(current.title || current.name || current.slug || id),
+      userId: user.id,
+      userEmail: user.email,
+      before: current,
+      after: restoredRecord,
+    });
+  }
   await audit("content.restored", moduleSlug, id);
   revalidateCmsTags(...cacheTagsForModule(moduleSlug as AdminModuleSlug));
   await revalidatePublicModulePaths(moduleSlug as AdminModuleSlug, current);
@@ -1007,17 +1191,10 @@ export async function restoreRecordAction(formData: FormData) {
   safeAdminRedirect(`/admin/${moduleSlug}?notice=restored`);
 }
 
-export async function exportModuleAction(formData: FormData) {
-  const user = await requireAdminUser("backups.export");
-  const moduleSlug = String(formData.get("module") || "pages") as AdminModuleSlug;
-  if (!can(user, "backups.export")) safeAdminRedirect(`/admin/${moduleSlug}?error=forbidden`);
-  await audit("backup.export_requested", moduleSlug);
-  safeAdminRedirect(`/admin/${moduleSlug}?notice=export-started`);
-}
-
 export async function uploadMediaAction(formData: FormData) {
   if (!(await verifyCsrfToken(formData.get("csrfToken")))) safeAdminRedirect("/admin/media?error=session");
   const user = await requireAdminUser("media.write");
+  await assertNoRestoreInProgress();
   const file = formData.get("file");
   if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
     safeAdminRedirect("/admin/media?error=file-required");
@@ -1050,11 +1227,25 @@ export async function uploadMediaAction(formData: FormData) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const result = await (await mongoCollection("mediaAssets")).insertOne(asset);
+    const mediaAssets = await mongoCollection("mediaAssets");
+    const result = await mediaAssets.insertOne(asset);
+    const createdAsset = await mediaAssets.findOne({ _id: result.insertedId });
+    if (createdAsset) {
+      await recordAdminChange({
+        action: "media.uploaded",
+        module: "media",
+        collectionName: "mediaAssets",
+        entityId: result.insertedId.toHexString(),
+        entityName: title,
+        userId: user.id,
+        userEmail: user.email,
+        before: null,
+        after: createdAsset,
+      });
+    }
     await audit("media.uploaded", "media", result.insertedId.toHexString(), title);
     revalidateCmsTags("cms-pages", "cms-blog");
     revalidatePath("/admin/media");
-    safeAdminRedirect("/admin/media?notice=uploaded");
   } catch (error) {
     await audit("media.upload_failed", "media", null, null, { message: error instanceof Error ? error.message : "Upload failed" });
     const uploadError =
@@ -1065,4 +1256,5 @@ export async function uploadMediaAction(formData: FormData) {
           : "upload";
     safeAdminRedirect(`/admin/media?error=${uploadError}`);
   }
+  safeAdminRedirect("/admin/media?notice=uploaded");
 }

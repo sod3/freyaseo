@@ -1,22 +1,31 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Filter, RotateCcw } from "lucide-react";
+import { CheckCircle2, Database, Download, Filter, HardDrive, History, RotateCcw, ShieldCheck } from "lucide-react";
 import { AdminDeleteButton } from "@/src/components/admin/AdminDeleteButton";
+import { BackupConfirmationButton } from "@/src/components/admin/BackupConfirmationButton";
 import {
   changePasswordAction,
-  exportModuleAction,
   restoreRecordAction,
   softDeleteRecordAction,
   uploadMediaAction,
 } from "@/src/lib/admin/actions";
+import {
+  createWebsiteBackupAction,
+  restoreWebsiteBackupAction,
+  undoAdminChangeAction,
+  verifyWebsiteBackupAction,
+} from "@/src/lib/admin/backup-actions";
 import { can, createCsrfToken, requireAdminUser } from "@/src/lib/admin/auth";
 import { creatableCmsModules, editableCmsModules } from "@/src/lib/admin/module-config";
 import { getAdminModule, type AdminModuleSlug } from "@/src/lib/admin/modules";
 import { getModuleRecords } from "@/src/lib/admin/queries";
+import { getBackupDashboardData } from "@/src/lib/admin/website-backups";
 import { activeLanguages, getLanguageSettings, languageLabel as cmsLanguageLabel, type CmsLanguage } from "@/src/lib/cms/languages";
 import { AdminRecordEditor } from "@/src/components/admin/AdminRecordEditor";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const createLabels: Partial<Record<AdminModuleSlug, string>> = {
   pages: "Create Page",
@@ -51,6 +60,13 @@ const adminErrorMessages: Record<string, string> = {
   "storage-configuration": "media storage is not configured for uploads",
   "storage-permission": "media storage rejected the upload credentials; update the Cloudinary or S3 key so it can create assets",
   upload: "media upload failed",
+  "backup-busy": "another backup or restore is already running",
+  "backup-storage": "persistent backup storage is not configured",
+  "backup-integrity": "the backup failed its integrity check and was not restored",
+  "backup-failed": "the backup operation failed; no unverified restore was applied",
+  "restore-confirmation": "restore confirmation was not accepted",
+  "undo-confirmation": "undo confirmation was not accepted",
+  "undo-conflict": "this item has newer changes; undo those first or restore a full backup",
 };
 
 function adminLanguageLabel(language: CmsLanguage) {
@@ -59,6 +75,191 @@ function adminLanguageLabel(language: CmsLanguage) {
 
 function adminStatusMessage(value: string) {
   return adminErrorMessages[value] || value.replace(/-/g, " ");
+}
+
+function formatBytes(value?: number) {
+  const bytes = Number(value || 0);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+}
+
+async function AdminBackupsView({
+  csrfToken,
+  canRestore,
+  notice,
+  error,
+}: {
+  csrfToken: string;
+  canRestore: boolean;
+  notice?: string;
+  error?: string;
+}) {
+  const data = await getBackupDashboardData();
+  return (
+    <>
+      <div className="admin-page-title">
+        <p className="admin-muted">Recovery center</p>
+        <h1>Website backups &amp; change history</h1>
+        <p className="admin-muted">Create restorable checkpoints, inspect every tracked admin update, undo one update, or return the whole managed website to a checkpoint.</p>
+      </div>
+
+      {notice ? <div className="admin-alert">Action complete: {adminStatusMessage(notice)}</div> : null}
+      {error ? <div className="admin-alert admin-alert-error">Could not complete action: {adminStatusMessage(error)}</div> : null}
+
+      <section className="admin-backup-overview">
+        <article className="admin-panel admin-backup-create">
+          <div className="admin-backup-heading">
+            <span className="admin-icon-tile"><ShieldCheck size={22} aria-hidden /></span>
+            <div>
+              <h2>Create a complete checkpoint</h2>
+              <p className="admin-muted">The database and every managed upload are encrypted, checksummed, and stored outside the application runtime.</p>
+            </div>
+          </div>
+          <form action={createWebsiteBackupAction} className="admin-backup-form">
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+            <label className="admin-field">
+              <span>Checkpoint name</span>
+              <input className="admin-input" name="label" maxLength={120} placeholder="Before homepage redesign" required />
+            </label>
+            <label className="admin-field">
+              <span>What are you about to change? (optional)</span>
+              <textarea className="admin-textarea" name="note" maxLength={600} rows={3} placeholder="Short reason or release note" />
+            </label>
+            <button className="admin-button admin-button-primary" type="submit" disabled={!data.storage.configured}>
+              <ShieldCheck size={17} aria-hidden />
+              Create backup now
+            </button>
+          </form>
+        </article>
+
+        <aside className="admin-panel admin-backup-safety">
+          <h2>Protection included</h2>
+          <ul className="admin-backup-checklist">
+            <li><CheckCircle2 size={17} aria-hidden /><span>Point-in-time database read</span></li>
+            <li><CheckCircle2 size={17} aria-hidden /><span>AES-256-GCM encryption and SHA-256 integrity checks</span></li>
+            <li><CheckCircle2 size={17} aria-hidden /><span>Uploaded media bytes, not only media links</span></li>
+            <li><CheckCircle2 size={17} aria-hidden /><span>Automatic safety backup before every restore</span></li>
+            <li><CheckCircle2 size={17} aria-hidden /><span>Conflict-safe undo for individual admin edits</span></li>
+          </ul>
+          <div className={`admin-storage-state ${data.storage.configured ? "is-ready" : "is-error"}`}>
+            <HardDrive size={18} aria-hidden />
+            <div><strong>{data.storage.configured ? "Backup storage ready" : "Setup required"}</strong><span>{data.storage.message || data.storage.label}</span></div>
+          </div>
+          <p className="admin-muted admin-small">Application source code, deployment configuration, and environment secrets are release infrastructure—not admin-managed website data—and are intentionally not restored from this screen.</p>
+        </aside>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-heading">
+          <div><p className="admin-muted">Restore points</p><h2>Backup history</h2></div>
+          <Database size={22} aria-hidden />
+        </div>
+        {data.backups.length ? (
+          <div className="admin-table admin-table-embedded">
+            <table>
+              <thead><tr><th>Checkpoint</th><th>State</th><th>Contents</th><th>Created</th><th>Actions</th></tr></thead>
+              <tbody>
+                {data.backups.map((backup) => (
+                  <tr key={backup._id}>
+                    <td>
+                      <strong>{backup.label}</strong>
+                      {backup.kind === "pre_restore" ? <div className="admin-muted">Automatic undo point</div> : null}
+                      {backup.note ? <div className="admin-muted">{backup.note}</div> : null}
+                    </td>
+                    <td>
+                      <span className={`admin-backup-status is-${backup.status}`}>{backup.status}</span>
+                      <div className="admin-muted">Integrity: {backup.integrityStatus}</div>
+                      {backup.errorMessage ? <div className="admin-inline-error">{backup.errorMessage}</div> : null}
+                    </td>
+                    <td>
+                      <strong>{backup.documentCount || 0} records</strong>
+                      <div className="admin-muted">{backup.collections?.length || 0} collections · {backup.mediaCount || 0} managed files · {formatBytes(backup.mediaByteSize)}</div>
+                      {backup.skippedMediaCount ? <div className="admin-muted">{backup.skippedMediaCount} bundled or external references need no object copy</div> : null}
+                    </td>
+                    <td>
+                      {backup.createdAt.toLocaleString()}
+                      <div className="admin-muted">{backup.createdByEmail}</div>
+                      {backup.lastRestoredAt ? <div className="admin-muted">Restored {backup.lastRestoredAt.toLocaleString()}</div> : null}
+                    </td>
+                    <td>
+                      <div className="admin-actions admin-actions-compact">
+                        {backup.status === "complete" ? (
+                          <>
+                            <a className="admin-button admin-button-secondary" href={`/admin/api/backups/${backup._id}/download`}>
+                              <Download size={16} aria-hidden /> Database archive
+                            </a>
+                            <form action={verifyWebsiteBackupAction}>
+                              <input type="hidden" name="csrfToken" value={csrfToken} />
+                              <input type="hidden" name="backupId" value={backup._id} />
+                              <button className="admin-button admin-button-secondary" type="submit">Verify</button>
+                            </form>
+                            {canRestore ? (
+                              <form action={restoreWebsiteBackupAction}>
+                                <input type="hidden" name="csrfToken" value={csrfToken} />
+                                <input type="hidden" name="backupId" value={backup._id} />
+                                <BackupConfirmationButton
+                                  value={backup._id}
+                                  confirmationField="confirmBackupId"
+                                  label={backup.kind === "pre_restore" ? "Undo restore" : "Restore"}
+                                  message={`Restore “${backup.label}”? A fresh safety backup will be created first. Current admin-managed content and media will be replaced.`}
+                                  className="admin-button admin-button-danger-outline"
+                                />
+                              </form>
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-muted">No checkpoints yet. Create one before your next website update.</p>}
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-section-heading">
+          <div><p className="admin-muted">Admin activity</p><h2>Reversible change history</h2></div>
+          <History size={22} aria-hidden />
+        </div>
+        <p className="admin-muted">Undo is allowed only while the record still matches that update. This prevents an older undo from erasing newer work.</p>
+        {data.changes.length ? (
+          <div className="admin-table admin-table-embedded">
+            <table>
+              <thead><tr><th>Update</th><th>Item</th><th>Administrator</th><th>Time</th><th>Action</th></tr></thead>
+              <tbody>
+                {data.changes.map((change) => (
+                  <tr key={change._id}>
+                    <td><strong>{change.action.replace(/\./g, " ")}</strong><div className="admin-muted">{change.module}</div></td>
+                    <td>{change.entityName}<div className="admin-muted">{change.entityId}</div></td>
+                    <td>{change.userEmail}</td>
+                    <td>{change.createdAt.toLocaleString()}</td>
+                    <td>
+                      {change.status === "active" && change.reversible && canRestore ? (
+                        <form action={undoAdminChangeAction}>
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <input type="hidden" name="changeId" value={change._id} />
+                          <BackupConfirmationButton
+                            value={change._id}
+                            confirmationField="confirmChangeId"
+                            label="Undo update"
+                            message={`Undo “${change.action.replace(/\./g, " ")}” for “${change.entityName}”?`}
+                          />
+                        </form>
+                      ) : <span className={`admin-backup-status is-${change.status}`}>{change.status}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="admin-muted">New admin edits will appear here with record-level undo.</p>}
+      </section>
+    </>
+  );
 }
 
 export default async function AdminModulePage({
@@ -79,6 +280,16 @@ export default async function AdminModulePage({
 
   const user = await requireAdminUser(adminModule.permission);
   const csrfToken = await createCsrfToken();
+  if (adminModule.slug === "backups") {
+    return (
+      <AdminBackupsView
+        csrfToken={csrfToken}
+        canRestore={can(user, "backups.restore")}
+        notice={query.notice}
+        error={query.error}
+      />
+    );
+  }
   const languageSettings = await getLanguageSettings();
   const languages = activeLanguages(languageSettings);
   const data = await getModuleRecords(adminModule.slug, query);
@@ -228,13 +439,10 @@ export default async function AdminModulePage({
           </Link>
         ) : null}
         {can(user, "backups.export") ? (
-          <form action={exportModuleAction}>
-            <input type="hidden" name="module" value={adminModule.slug} />
-            <button className="admin-button admin-button-secondary" type="submit">
-              <Download size={17} aria-hidden />
-              Export
-            </button>
-          </form>
+          <Link className="admin-button admin-button-secondary" href="/admin/backups">
+            <ShieldCheck size={17} aria-hidden />
+            Backups
+          </Link>
         ) : null}
       </div>
 

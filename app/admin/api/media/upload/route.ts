@@ -1,6 +1,8 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { can, getCurrentAdminUser, getRequestMeta } from "@/src/lib/admin/auth";
+import { assertNoRestoreInProgress, BackupBusyError } from "@/src/lib/admin/backup-lock";
+import { recordAdminChange } from "@/src/lib/admin/change-history";
 import { activeLanguages, getLanguageSettings } from "@/src/lib/cms/languages";
 import { isMongoConfigured, mongoCollection } from "@/src/lib/mongo";
 import { saveUpload, StorageUploadError } from "@/src/lib/storage";
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
   if (!isMongoConfigured()) return jsonError("MongoDB is not configured.", 503);
 
   try {
+    await assertNoRestoreInProgress();
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || typeof file !== "object" || !("arrayBuffer" in file) || !("name" in file)) {
@@ -67,7 +70,22 @@ export async function POST(request: Request) {
       updatedAt: now,
     };
 
-    const result = await (await mongoCollection("mediaAssets")).insertOne(asset);
+    const mediaAssets = await mongoCollection("mediaAssets");
+    const result = await mediaAssets.insertOne(asset);
+    const createdAsset = await mediaAssets.findOne({ _id: result.insertedId });
+    if (createdAsset) {
+      await recordAdminChange({
+        action: "media.uploaded",
+        module: "media",
+        collectionName: "mediaAssets",
+        entityId: result.insertedId.toHexString(),
+        entityName: title,
+        userId: user.id,
+        userEmail: user.email,
+        before: null,
+        after: createdAsset,
+      });
+    }
     await auditUpload("media.uploaded", user.id, title, { source: "inline-editor" });
     updateTag("cms-pages");
     updateTag("cms-blog");
@@ -83,7 +101,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed.";
-    const status = error instanceof StorageUploadError ? error.status : 400;
+    const status = error instanceof BackupBusyError ? 503 : error instanceof StorageUploadError ? error.status : 400;
     await auditUpload("media.upload_failed", user.id, null, { message, source: "inline-editor" });
     return jsonError(message, status);
   }

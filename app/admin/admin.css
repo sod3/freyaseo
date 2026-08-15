@@ -823,6 +823,159 @@
   grid-template-columns: minmax(220px, 1fr) 150px 150px auto;
 }
 
+.admin-backup-overview {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+}
+
+.admin-backup-create,
+.admin-backup-safety,
+.admin-backup-form {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-backup-heading,
+.admin-section-heading,
+.admin-storage-state {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+}
+
+.admin-section-heading {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.admin-section-heading h2,
+.admin-section-heading p,
+.admin-backup-heading h2,
+.admin-backup-heading p,
+.admin-storage-state strong,
+.admin-storage-state span {
+  margin: 0;
+}
+
+.admin-icon-tile {
+  align-items: center;
+  background: #e5f1e7;
+  border-radius: 8px;
+  color: #0b3526;
+  display: inline-flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+}
+
+.admin-backup-checklist {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-backup-checklist li {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+}
+
+.admin-backup-checklist svg,
+.admin-storage-state.is-ready svg {
+  color: #237a45;
+}
+
+.admin-storage-state {
+  background: #f3f8f3;
+  border: 1px solid #cce2d1;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.admin-storage-state.is-error {
+  background: #fff5f3;
+  border-color: #f0c7be;
+  color: #8c2f20;
+}
+
+.admin-storage-state div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-storage-state span,
+.admin-small {
+  font-size: 0.82rem;
+}
+
+.admin-table-embedded {
+  border: 0;
+  box-shadow: none;
+  margin: 0 -20px -20px;
+}
+
+.admin-actions-compact {
+  align-items: stretch;
+  display: grid;
+  min-width: 150px;
+}
+
+.admin-actions-compact .admin-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.admin-backup-status {
+  background: #eef2ec;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+
+.admin-backup-status.is-complete,
+.admin-backup-status.is-verified,
+.admin-backup-status.is-active {
+  background: #dff2e4;
+  color: #1f6b3d;
+}
+
+.admin-backup-status.is-failed,
+.admin-backup-status.is-conflict {
+  background: #fde8e4;
+  color: #9a3424;
+}
+
+.admin-backup-status.is-creating,
+.admin-backup-status.is-undoing {
+  background: #fff1c7;
+  color: #735600;
+}
+
+.admin-inline-error {
+  color: #9a3424;
+  font-size: 0.78rem;
+  margin-top: 5px;
+  max-width: 300px;
+}
+
+.admin-button-danger-outline {
+  background: #ffffff;
+  border: 1px solid #cb5a45;
+  color: #a23826;
+}
+
+.admin-button-danger-outline:hover {
+  background: #fff3f0;
+}
+
 @media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
@@ -845,6 +998,10 @@
   }
 
   .admin-editor-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-backup-overview {
     grid-template-columns: 1fr;
   }
 

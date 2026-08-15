@@ -19,7 +19,7 @@ function mongoModule() {
   return mongoModulePromise;
 }
 
-async function clientPromise() {
+export async function mongoClient() {
   if (!isMongoConfigured()) {
     throw new Error("MONGODB_URI is not configured.");
   }
@@ -34,7 +34,7 @@ async function clientPromise() {
 }
 
 export async function mongoDb(): Promise<Db> {
-  const client = await clientPromise();
+  const client = await mongoClient();
   return client.db(mongoDatabaseName());
 }
 

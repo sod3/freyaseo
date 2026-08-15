@@ -75,7 +75,7 @@ export const adminModules: AdminModule[] = [
   { slug: "settings", label: "Settings", description: "Website, branding, language, maintenance and security settings.", permission: "settings.manage", icon: Settings },
   { slug: "audit-logs", label: "Audit Logs", description: "Review security and content activity.", permission: "audit.read", icon: Activity },
   { slug: "taxonomy", label: "Tags & Categories", description: "Manage reusable tags and content categories.", permission: "content.read", icon: Tags },
-  { slug: "backups", label: "Backups", description: "Export content backups and form submission CSVs.", permission: "backups.export", icon: ShieldCheck },
+  { slug: "backups", label: "Backups", description: "Create full checkpoints, inspect changes, restore, and undo safely.", permission: "backups.export", icon: ShieldCheck },
 ];
 
 export const adminPrimaryModules = adminModules.filter((item) =>
