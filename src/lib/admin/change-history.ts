@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { BSON, type Document } from "mongodb";
+import type { Document } from "mongodb";
 import { assertNoRestoreInProgress } from "./backup-lock";
 import { mongoCollection } from "@/src/lib/mongo";
 import type { AdminModuleSlug } from "./modules";
@@ -51,13 +51,17 @@ export type RecordAdminChangeInput = {
   undoOf?: string | null;
 };
 
-function canonicalEjson(value: unknown) {
+let mongoModulePromise: Promise<typeof import("mongodb")> | undefined;
+
+async function canonicalEjson(value: unknown) {
+  mongoModulePromise ||= import("mongodb");
+  const { BSON } = await mongoModulePromise;
   return BSON.EJSON.stringify(value, { relaxed: false });
 }
 
-export function documentFingerprint(value: unknown) {
+export async function documentFingerprint(value: unknown) {
   if (value === null || value === undefined) return null;
-  return crypto.createHash("sha256").update(canonicalEjson(value)).digest("hex");
+  return crypto.createHash("sha256").update(await canonicalEjson(value)).digest("hex");
 }
 
 function documentKey(document: Document | null) {
@@ -71,6 +75,10 @@ export async function recordAdminChange(input: RecordAdminChangeInput) {
   }
   const id = crypto.randomUUID();
   const reversible = input.reversible !== false;
+  const [beforeFingerprint, afterFingerprint] = await Promise.all([
+    documentFingerprint(input.before),
+    documentFingerprint(input.after),
+  ]);
   await (await mongoCollection<AdminChangeRecord>("adminChanges")).insertOne({
     _id: id,
     action: input.action,
@@ -82,8 +90,8 @@ export async function recordAdminChange(input: RecordAdminChangeInput) {
     userEmail: input.userEmail,
     before: input.before,
     after: input.after,
-    beforeFingerprint: documentFingerprint(input.before),
-    afterFingerprint: documentFingerprint(input.after),
+    beforeFingerprint,
+    afterFingerprint,
     status: "active",
     reversible,
     undoOf: input.undoOf || null,
@@ -117,7 +125,7 @@ export async function undoAdminChange(changeId: string, user: { id: string; emai
     const collection = await mongoCollection(change.collectionName);
     const key = documentKey(change.after || change.before);
     const current = await collection.findOne({ _id: key });
-    if (documentFingerprint(current) !== change.afterFingerprint) {
+    if ((await documentFingerprint(current)) !== change.afterFingerprint) {
       await changes.updateOne({ _id: changeId }, { $set: { status: "active" } });
       throw new ChangeConflictError();
     }

@@ -4,7 +4,7 @@ import path from "node:path";
 import { gzip, gunzip } from "node:zlib";
 import { promisify } from "node:util";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { BSON, type Document, type IndexSpecification } from "mongodb";
+import type { Document, IndexSpecification } from "mongodb";
 import { documentId, mongoClient, mongoCollection, mongoDb } from "@/src/lib/mongo";
 import { listAdminChanges } from "./change-history";
 import {
@@ -297,11 +297,17 @@ async function backupManagedMedia(archive: WebsiteBackupArchive, lockOperationId
   return { media, skipped };
 }
 
-function serializeArchive(archive: WebsiteBackupArchive) {
+let mongoModulePromise: Promise<typeof import("mongodb")> | undefined;
+
+async function serializeArchive(archive: WebsiteBackupArchive) {
+  mongoModulePromise ||= import("mongodb");
+  const { BSON } = await mongoModulePromise;
   return Buffer.from(BSON.EJSON.stringify(archive, { relaxed: false }), "utf8");
 }
 
-function parseArchive(bytes: Uint8Array) {
+async function parseArchive(bytes: Uint8Array) {
+  mongoModulePromise ||= import("mongodb");
+  const { BSON } = await mongoModulePromise;
   const parsed = BSON.EJSON.parse(Buffer.from(bytes).toString("utf8"), { relaxed: false }) as WebsiteBackupArchive;
   if (parsed?.format !== BACKUP_FORMAT || parsed.version !== BACKUP_FORMAT_VERSION || !Array.isArray(parsed.collections)) {
     throw new Error("Backup archive format or version is not supported.");
@@ -346,7 +352,7 @@ export async function createWebsiteBackup(
     const archive = await captureDatabaseSnapshot(backupId, lockOperationId);
     const mediaResult = await backupManagedMedia(archive, lockOperationId);
     archive.media = mediaResult.media;
-    const serialized = serializeArchive(archive);
+    const serialized = await serializeArchive(archive);
     const compressed = await gzipAsync(serialized, { level: 9 });
     const databaseChecksum = sha256Hex(compressed);
     const encrypted = encryptBackupBytes(compressed);
@@ -404,7 +410,7 @@ async function readVerifiedArchive(backupId: string, verifyMedia: boolean, lockO
   if (sha256Hex(encrypted) !== record.encryptedObjectChecksum) throw new Error("Encrypted backup checksum does not match.");
   const compressed = decryptBackupBytes(encrypted);
   if (sha256Hex(compressed) !== record.databaseChecksum) throw new Error("Backup data checksum does not match.");
-  const archive = parseArchive(await gunzipAsync(compressed));
+  const archive = await parseArchive(await gunzipAsync(compressed));
   if (archive.backupId !== backupId) throw new Error("Backup identity does not match its manifest.");
 
   if (verifyMedia) {
