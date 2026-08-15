@@ -139,6 +139,28 @@ function s3Client() {
   };
 }
 
+function backupProviderError(operation: "read" | "write", error: unknown) {
+  const providerError = error as Error & { code?: string; name?: string; $metadata?: { httpStatusCode?: number } };
+  const status = providerError.$metadata?.httpStatusCode;
+  const code = String(providerError.code || providerError.name || "");
+  const message = String(providerError.message || "");
+  const action = operation === "write" ? "write backup objects" : "read backup objects";
+
+  if (status === 401 || status === 403 || /unauthori[sz]ed|access\s*denied|invalidaccesskey|signaturedoesnotmatch/i.test(`${code} ${message}`)) {
+    return new Error(
+      `Backup storage could not ${action}: the S3-compatible endpoint rejected its access key. Verify the endpoint jurisdiction, bucket, access-key ID, secret, and object permissions.`,
+      { cause: error },
+    );
+  }
+  if (/EPROTO|SSL|TLS|handshake|secure channel/i.test(`${code} ${message}`)) {
+    return new Error(
+      `Backup storage could not ${action}: its TLS handshake failed. Verify that S3_ENDPOINT is the exact HTTPS endpoint shown by the provider, including any jurisdiction segment.`,
+      { cause: error },
+    );
+  }
+  return new Error(`Backup storage could not ${action}: ${message || "the provider request failed."}`, { cause: error });
+}
+
 function localBackupPath(key: string) {
   const rootValue = envValue(process.env.CMS_BACKUP_LOCAL_DIR);
   if (!rootValue) throw new Error("CMS_BACKUP_LOCAL_DIR is not configured.");
@@ -161,16 +183,20 @@ export async function putBackupObject(key: string, bytes: Uint8Array, contentTyp
     await fs.writeFile(target, body, { flag: "wx" });
   } else {
     const { client, bucket } = s3Client();
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        CacheControl: "private, no-store",
-        Metadata: { "freya-sha256": checksum },
-      }),
-    );
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          CacheControl: "private, no-store",
+          Metadata: { "freya-sha256": checksum },
+        }),
+      );
+    } catch (error) {
+      throw backupProviderError("write", error);
+    }
   }
 
   return { key, byteSize: body.length, checksum };
@@ -182,7 +208,11 @@ export async function readBackupObject(key: string) {
   if (state.driver === "local") return fs.readFile(localBackupPath(key));
 
   const { client, bucket } = s3Client();
-  const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  if (!response.Body) throw new Error("Backup object has no content.");
-  return Buffer.from(await response.Body.transformToByteArray());
+  try {
+    const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    if (!response.Body) throw new Error("Backup object has no content.");
+    return Buffer.from(await response.Body.transformToByteArray());
+  } catch (error) {
+    throw backupProviderError("read", error);
+  }
 }

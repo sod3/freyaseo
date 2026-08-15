@@ -69,3 +69,25 @@ CMS_LOCAL_UPLOAD_DIR=/var/www/freyaseo/uploads
 ```
 
 Local storage is blocked on Vercel.
+
+## Repair legacy local-media records
+
+Older records can contain an absolute path from the computer where an upload was created, for example a Windows `C:\...` path. That path is not portable to a Linux deployment and local serverless storage is not durable. The backup reader now treats such a path as stale: it keeps the upload-root containment check, resolves the filename only inside the current `CMS_LOCAL_UPLOAD_DIR`, and can use the same-site `/uploads/...` delivery route when the bytes are available there. It never follows an arbitrary external URL.
+
+For a serverless production site, migrate recoverable local assets to Cloudinary instead of relying on that fallback:
+
+```bash
+# Read-only inventory and local checksum pass.
+npm run media:migrate-local
+
+# Upload, download, checksum-verify, then transactionally update MongoDB.
+npm run media:migrate-local -- --apply
+```
+
+The apply command stops before changing MongoDB if any local source file is missing. Each Cloudinary upload is downloaded again and compared byte-for-byte before the related database record changes. The migration is idempotent: after success, a new dry run reports zero local assets.
+
+## Research basis
+
+- Node's `path` behavior is operating-system-specific; its documented `path.win32` and `path.posix` variants explain why a Windows absolute path cannot be parsed with the host-default POSIX implementation: <https://nodejs.org/api/path.html#windows-vs-posix>
+- Vercel documents that runtime filesystem writes are ephemeral and recommends persistent object storage for application data: <https://vercel.com/guides/how-can-i-use-files-in-serverless-functions>
+- Cloudinary accepts backend uploads from file data and returns a durable delivery URL/public ID: <https://cloudinary.com/documentation/upload_images>

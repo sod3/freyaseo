@@ -17,6 +17,12 @@ import {
   sha256Hex,
 } from "./backup-store";
 import { acquireBackupLock, releaseBackupLock, renewBackupLock } from "./backup-lock";
+import {
+  fallbackRelativeLocalMediaKey,
+  localMediaPathCandidates,
+  portablePathBasename,
+  relativeUploadKeyFromUrl,
+} from "./local-media-paths";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -105,6 +111,11 @@ export type WebsiteBackupRecord = {
 };
 
 type BackupUser = { id: string; email: string };
+
+type ManagedMediaRead = {
+  bytes: Buffer;
+  relativeStorageKey?: string;
+};
 
 type RestoreOperationRecord = Document & {
   _id: string;
@@ -203,20 +214,104 @@ function storageS3Client() {
   };
 }
 
-function safeLocalMediaPath(storageKey: string) {
-  const rootValue = envValue(process.env.CMS_LOCAL_UPLOAD_DIR);
-  if (!rootValue) throw new Error("CMS_LOCAL_UPLOAD_DIR is not configured.");
-  const root = path.resolve(rootValue);
-  const target = path.resolve(storageKey);
-  const relative = path.relative(root, target);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("A media path is outside the managed upload directory.");
-  return target;
+function maxManagedMediaBytes() {
+  const configured = Number(envValue(process.env.CMS_BACKUP_MAX_MEDIA_BYTES));
+  return Number.isSafeInteger(configured) && configured > 0 ? configured : 25 * 1024 * 1024;
 }
 
-function relativeLocalMediaKey(storageKey: string) {
-  const target = safeLocalMediaPath(storageKey);
-  const root = path.resolve(envValue(process.env.CMS_LOCAL_UPLOAD_DIR));
-  return path.relative(root, target).split(path.sep).join("/");
+function mediaIdentity(asset: Document) {
+  return String(asset.fileName || asset.originalFileName || documentId(asset) || "unknown media");
+}
+
+function assertManagedMediaSize(byteSize: number, asset: Document) {
+  if (byteSize > maxManagedMediaBytes()) {
+    throw new Error(`Managed media "${mediaIdentity(asset)}" exceeds the backup per-file size limit.`);
+  }
+}
+
+async function limitedResponseBytes(response: Response, asset: Document) {
+  const declaredSize = Number(response.headers.get("content-length") || 0);
+  if (Number.isFinite(declaredSize) && declaredSize > 0) assertManagedMediaSize(declaredSize, asset);
+  if (!response.body) return Buffer.alloc(0);
+
+  const chunks: Uint8Array[] = [];
+  const reader = response.body.getReader();
+  let byteSize = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteSize += value.byteLength;
+    assertManagedMediaSize(byteSize, asset);
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), byteSize);
+}
+
+async function readPublicLocalMedia(asset: Document) {
+  const relativeStorageKey = relativeUploadKeyFromUrl(String(asset.url || ""));
+  const siteValue = envValue(process.env.NEXT_PUBLIC_SITE_URL);
+  if (!relativeStorageKey || !siteValue) return null;
+
+  let siteUrl: URL;
+  try {
+    siteUrl = new URL(siteValue);
+  } catch {
+    return null;
+  }
+  if (!["http:", "https:"].includes(siteUrl.protocol) || siteUrl.username || siteUrl.password) return null;
+
+  const encodedPath = relativeStorageKey
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const deliveryUrl = new URL(`/uploads/${encodedPath}`, siteUrl.origin);
+  let response: Response;
+  try {
+    response = await fetch(deliveryUrl, {
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  return { bytes: await limitedResponseBytes(response, asset), relativeStorageKey };
+}
+
+async function readLocalManagedMedia(asset: Document): Promise<ManagedMediaRead> {
+  const rootValue = envValue(process.env.CMS_LOCAL_UPLOAD_DIR);
+  const candidates = localMediaPathCandidates(rootValue, {
+    storageKey: String(asset.storageKey || ""),
+    fileName: String(asset.fileName || asset.originalFileName || ""),
+    url: String(asset.url || ""),
+  });
+
+  for (const candidate of candidates) {
+    try {
+      const stats = await fs.stat(candidate.target);
+      if (!stats.isFile()) continue;
+      assertManagedMediaSize(stats.size, asset);
+      return { bytes: await fs.readFile(candidate.target), relativeStorageKey: candidate.relativeStorageKey };
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") continue;
+      throw error;
+    }
+  }
+
+  const publicCopy = await readPublicLocalMedia(asset);
+  if (publicCopy) return publicCopy;
+
+  const expectedKey = fallbackRelativeLocalMediaKey({
+    storageKey: String(asset.storageKey || ""),
+    fileName: String(asset.fileName || asset.originalFileName || ""),
+    url: String(asset.url || ""),
+  });
+  throw new Error(
+    `Managed local media "${mediaIdentity(asset)}" is unavailable on this host${expectedKey ? ` at ${expectedKey}` : ""}. ` +
+      "Move it into the configured upload directory or migrate the asset to persistent S3/Cloudinary storage before creating a complete backup.",
+  );
 }
 
 function localMediaRestorePath(relativeStorageKey: string) {
@@ -228,11 +323,13 @@ function localMediaRestorePath(relativeStorageKey: string) {
   const root = path.resolve(rootValue);
   const target = path.resolve(root, ...relativeStorageKey.split("/"));
   const relative = path.relative(root, target);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("A local media restore path is outside the managed upload directory.");
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error("A local media restore path is outside the managed upload directory.");
+  }
   return target;
 }
 
-async function readManagedMedia(asset: Document) {
+async function readManagedMedia(asset: Document): Promise<ManagedMediaRead | null> {
   const driver = String(asset.storageDriver || "").toUpperCase();
   const storageKey = String(asset.storageKey || "");
   if (!storageKey || !["S3", "CLOUDINARY", "LOCAL"].includes(driver)) return null;
@@ -241,10 +338,12 @@ async function readManagedMedia(asset: Document) {
     const { client, bucket } = storageS3Client();
     const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
     if (!response.Body) throw new Error(`Managed media ${documentId(asset)} is missing from S3 storage.`);
-    return Buffer.from(await response.Body.transformToByteArray());
+    const bytes = Buffer.from(await response.Body.transformToByteArray());
+    assertManagedMediaSize(bytes.length, asset);
+    return { bytes };
   }
 
-  if (driver === "LOCAL") return fs.readFile(safeLocalMediaPath(storageKey));
+  if (driver === "LOCAL") return readLocalManagedMedia(asset);
 
   const assetUrl = new URL(String(asset.url || ""));
   const cloudName = envValue(process.env.CLOUDINARY_CLOUD_NAME) || (() => {
@@ -257,9 +356,9 @@ async function readManagedMedia(asset: Document) {
   if (assetUrl.protocol !== "https:" || assetUrl.hostname !== "res.cloudinary.com" || !assetUrl.pathname.startsWith(`/${cloudName}/`)) {
     throw new Error(`Managed Cloudinary media ${documentId(asset)} has an unexpected delivery URL.`);
   }
-  const response = await fetch(assetUrl, { cache: "no-store", signal: AbortSignal.timeout(60_000) });
+  const response = await fetch(assetUrl, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(60_000) });
   if (!response.ok) throw new Error(`Managed Cloudinary media ${documentId(asset)} could not be downloaded.`);
-  return Buffer.from(await response.arrayBuffer());
+  return { bytes: await limitedResponseBytes(response, asset) };
 }
 
 async function backupManagedMedia(archive: WebsiteBackupArchive, lockOperationId: string) {
@@ -269,11 +368,12 @@ async function backupManagedMedia(archive: WebsiteBackupArchive, lockOperationId
   let skipped = 0;
 
   for (const [index, asset] of mediaCollection.documents.entries()) {
-    const bytes = await readManagedMedia(asset);
-    if (!bytes) {
+    const managedMedia = await readManagedMedia(asset);
+    if (!managedMedia) {
       skipped += 1;
       continue;
     }
+    const { bytes } = managedMedia;
     const assetId = documentId(asset) || String(index);
     const encrypted = encryptBackupBytes(bytes);
     const objectKey = backupObjectKey(archive.backupId, `media/${String(index).padStart(6, "0")}.bin`);
@@ -288,7 +388,7 @@ async function backupManagedMedia(archive: WebsiteBackupArchive, lockOperationId
       objectKey,
       storageDriver: String(asset.storageDriver || "").toUpperCase() as BackupMediaObject["storageDriver"],
       storageKey: String(asset.storageKey || ""),
-      relativeStorageKey: String(asset.storageDriver || "").toUpperCase() === "LOCAL" ? relativeLocalMediaKey(String(asset.storageKey || "")) : undefined,
+      relativeStorageKey: String(asset.storageDriver || "").toUpperCase() === "LOCAL" ? managedMedia.relativeStorageKey : undefined,
       url: String(asset.url || ""),
     });
     await renewBackupLock(lockOperationId);
@@ -502,7 +602,7 @@ async function restoreArchiveMedia(archive: WebsiteBackupArchive, lockOperationI
       const { client, bucket } = storageS3Client();
       await client.send(new PutObjectCommand({ Bucket: bucket, Key: media.storageKey, Body: bytes, ContentType: media.contentType }));
     } else if (media.storageDriver === "LOCAL") {
-      const target = localMediaRestorePath(media.relativeStorageKey || path.basename(media.storageKey));
+      const target = localMediaRestorePath(media.relativeStorageKey || portablePathBasename(media.storageKey));
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, bytes);
       if (target !== media.storageKey) urlMap.set(media.storageKey, target);

@@ -15,6 +15,8 @@ Each successful checkpoint contains:
 
 The encrypted objects are kept under `CMS_BACKUP_PREFIX/<backup-id>/` in a private S3-compatible bucket, or in `CMS_BACKUP_LOCAL_DIR` for a server with a durable local disk.
 
+For local-media records, backup paths are portable across Windows and POSIX hosts. A stored absolute path is accepted directly only when it is still inside the current managed upload root; otherwise the reader searches for the record's safe relative upload key or filename under that root. As a final compatibility path it may download only a root-relative `/uploads/...` URL from the configured `NEXT_PUBLIC_SITE_URL`. Traversal segments, encoded path separators, external hosts, redirects, oversized responses, and paths outside the managed root are rejected.
+
 Bundled files from `public/`, application source code, dependencies, deployment configuration, and environment variables are release infrastructure. They cannot be changed by this CMS and are intentionally not rolled backward by the admin panel. External media URLs and bundled file references remain in the database snapshot, but their bytes are not copied because the CMS does not own them.
 
 ## Security data and audit continuity
@@ -65,6 +67,7 @@ CMS_BACKUP_DRIVER="s3"
 CMS_BACKUP_BUCKET="private-freya-backups"
 CMS_BACKUP_PREFIX="cms-backups"
 CMS_BACKUP_ENCRYPTION_KEY="a-stable-secret-with-at-least-32-characters"
+CMS_BACKUP_MAX_MEDIA_BYTES="26214400"
 
 S3_ENDPOINT="https://your-s3-compatible-endpoint"
 S3_REGION="auto"
@@ -73,6 +76,8 @@ S3_SECRET_ACCESS_KEY="..."
 ```
 
 If `CMS_BACKUP_BUCKET` is empty, `S3_BUCKET` is used. The S3 credentials require read and create/write access to the backup prefix. They also require read/write access to CMS media keys when S3 is the media provider.
+
+For Cloudflare R2, copy the S3 endpoint from the R2 dashboard exactly. Jurisdictional buckets use a different hostname from standard buckets (for example, the endpoint contains `.eu.r2.` or `.fedramp.r2.`). A standard hostname for a jurisdictional account can fail during TLS negotiation, while a key for a different account or without object permission returns `Unauthorized`. See Cloudflare's [S3 API endpoint documentation](https://developers.cloudflare.com/r2/api/s3/api/) and [jurisdiction restrictions](https://developers.cloudflare.com/r2/reference/data-location/#jurisdictional-restrictions).
 
 `CMS_BACKUP_ENCRYPTION_KEY` falls back to `AUTH_SECRET`, but a separate, stable secret is strongly recommended. Losing or rotating this key without retaining the old value makes existing encrypted backups unreadable. Never store the key in the backup bucket or commit it to source control.
 
@@ -85,6 +90,8 @@ CMS_BACKUP_ENCRYPTION_KEY="a-stable-secret-with-at-least-32-characters"
 ```
 
 Local backup storage is rejected on Vercel because its runtime disk is not durable.
+
+`CMS_BACKUP_MAX_MEDIA_BYTES` is optional and defaults to 25 MiB per managed media object. Keep it above the application's upload limit while using it to bound memory during provider and compatibility downloads.
 
 After deploying this feature, run `npm run db:migrate` once to create the backup, history, lock, and restore-operation indexes.
 
